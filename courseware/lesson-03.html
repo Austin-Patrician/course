@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>有个活要干,该挑哪个模型?</title>
+<style id="deck-css">
+/* ==========================================================================
+   deck.css — AI 科普课件设计系统 v2.0
+   契约见 ../../contract.md。改这里之后必须跑 build.ps1 重新内联。
+
+   v2.0 相对 v1.0 的变化:
+     · 取消「底部 200px 全空」(依据错误,见契约第 1 条),改为只避开右下角死区
+     · 新增固定顶栏(chrome)+ 页脚锚点带,把页面上下都填满
+     · 新增卡片系统(阴影 / 圆角 / 品牌色顶边 / 序号徽章)
+     · 内容区垂直居中,空白均匀分布在上下,不再全堆在底部
+   ========================================================================== */
+
+:root{
+  /* ---- 画布 ---- */
+  --stage-w: 1920px;
+  --stage-h: 1080px;
+  --pad-x: 96px;
+  --chrome-top: 44px;      /* 顶栏距舞台顶部 */
+  --chrome-h: 52px;        /* 顶栏高度 */
+  --pad-top: 132px;        /* 内容区上边 = chrome-top + chrome-h + 间距 */
+  --pad-bottom: 64px;
+
+  /* ---- 颜色 ---- */
+  --bg-1:    #FBFBF9;
+  --bg-2:    #F4F4F1;
+  --card:    #FFFFFF;
+  --ink:     #14161C;
+  --ink-2:   #3A3F4A;
+  --muted:   #767C88;
+  --line:    #E2E2DC;
+  --line-2:  #EFEFEA;
+
+  /* ---- 深度 ---- */
+  --shadow-1: 0 1px 2px rgba(20,22,28,.04), 0 8px 24px rgba(20,22,28,.06);
+  --shadow-2: 0 2px 8px rgba(20,22,28,.06), 0 20px 48px rgba(20,22,28,.10);
+  --r-lg: 24px;
+  --r-md: 16px;
+  --r-sm: 10px;
+
+  /* ---- 字体 ---- */
+  --font-cn: "PingFang SC", "HarmonyOS Sans SC", "Source Han Sans SC",
+             "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular",
+               "Consolas", "Courier New", monospace;
+
+  /* ---- 字号阶梯(契约第 2 条,不得下调)---- */
+  --fs-cover:  132px;
+  --fs-h1:      92px;
+  --fs-co:      88px;
+  --fs-family:  64px;
+  --fs-model:   46px;
+  --fs-body:    44px;   /* 正文下限 */
+  --fs-meta:    34px;
+  --fs-label:   28px;
+
+  --rise: 320ms;
+
+  /* ---- 品牌色(契约第 6 条,改色只改这里)----
+     全部取自 simple-icons 官方库,已逐个核实。
+     注意 xAI 与月之暗面的官方色都是纯黑 —— 靠图标区分,不要为了好看改色。
+     若想用 Claude 产品线的珊瑚色替换 Anthropic 企业色:#191919 -> #D97757 */
+  --brand-openai:    #412991;  /* ✅ */
+  --brand-anthropic: #191919;  /* ✅ 企业色(Claude 产品线为 #D97757) */
+  --brand-google:    #4285F4;  /* ✅ */
+  --brand-xai:       #000000;  /* ✅ */
+  --brand-deepseek:  #5786FE;  /* ✅ 修正:此前误填 #4D6BFE */
+  --brand-moonshot:  #000000;  /* ✅ */
+  --brand-alibaba:   #FF6A00;  /* ✅ */
+  --brand-minimax:   #E73562;  /* ✅ 修正:此前误判为黑色 */
+  --brand-bytedance: #3C8CFF;  /* ✅ */
+
+  /* ---- 第二讲:工具品牌色 ---- */
+  --brand-tool-codex:      var(--brand-openai);    /* Codex 用 OpenAI 标记 */
+  --brand-tool-claudecode: #D97757;                /* ✅ Claude 产品线珊瑚色 */
+  --brand-tool-trae:       #32F08C;                /* ✅ simple-icons: trae */
+  --brand-tool-workbuddy:  #0EC8A9;                /* ✅ 取自官方 logo 渐变起点 */
+  --brand-tool-dsh:        var(--brand-deepseek);  /* DeepSeek Harness */
+}
+
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body{
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #14161C;
+  color: var(--ink);
+  font-family: var(--font-cn);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ==========================================================================
+   舞台
+   ========================================================================== */
+#stage{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  transform-origin: center center;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+}
+
+.slide{
+  position: absolute;
+  inset: 0;
+  padding: var(--pad-top) var(--pad-x) var(--pad-bottom);
+  display: none;
+  flex-direction: column;
+}
+.slide.is-active{ display: flex; }
+
+/* ---------- 固定顶栏(chrome,所有页共用)---------- */
+.chrome{
+  position: absolute;
+  left: var(--pad-x);
+  right: var(--pad-x);
+  top: var(--chrome-top);
+  height: var(--chrome-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--line);
+  z-index: 6;
+}
+.chrome-lesson{
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+.chrome-step{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  letter-spacing: .06em;
+}
+.chrome-right{
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+.chrome-date{
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  letter-spacing: .08em;
+}
+
+#progress{
+  position: absolute;
+  left: 0; top: 0;
+  height: 5px;
+  width: 0;
+  background: var(--ink);
+  transition: width 220ms ease;
+  z-index: 8;
+}
+
+/* ==========================================================================
+   动效 —— 契约第 7 条
+   ========================================================================== */
+@keyframes rise{
+  from{ opacity: 0; transform: translateY(10px); }
+  to  { opacity: 1; transform: translateY(0); }
+}
+.slide.is-active [data-anim]{
+  animation: rise var(--rise) cubic-bezier(.22,.61,.36,1) both;
+  animation-delay: calc(var(--d, 0) * 60ms);
+}
+@media (prefers-reduced-motion: reduce){
+  .slide.is-active [data-anim]{ animation: none; }
+}
+
+.mono{ font-family: var(--font-mono); }
+
+.icon{
+  width: 1em; height: 1em;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* ==========================================================================
+   通用标题块
+   ========================================================================== */
+.title-block{ margin-bottom: 56px; }
+.slide.tight .title-block{ margin-bottom: 28px; }
+.kicker{
+  font-size: var(--fs-label);
+  letter-spacing: .18em;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.title-block h2{
+  font-size: var(--fs-h1);
+  line-height: 1.14;
+  letter-spacing: -0.02em;
+}
+.title-block .sub{
+  margin-top: 24px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+
+/* 内容区:垂直居中,空白均匀分上下 */
+.main{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   封面
+   ========================================================================== */
+.cover .main{ justify-content: center; }
+.cover .eyebrow{
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  align-self: flex-start;
+  padding: 12px 22px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  margin-bottom: 48px;
+}
+.cover h1{
+  font-size: var(--fs-cover);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  max-width: 1560px;
+}
+.cover .sub{
+  margin-top: 44px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+.cover .stamp{
+  margin-top: 56px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   卡片系统
+   ========================================================================== */
+.card{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.pill{
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: #F1F1ED;
+  background: color-mix(in srgb, var(--brand, #767C88) 12%, #FFFFFF);
+  color: var(--ink-2);
+  font-size: var(--fs-label);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+
+/* ==========================================================================
+   并列卡片组(钩子页 / 步骤页)
+   ========================================================================== */
+.cards{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+.cards .card{
+  padding: 44px 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.cards .card.is-hit{
+  box-shadow: var(--shadow-2);
+  border-top: 8px solid var(--ink);
+}
+.cards .card.is-miss{ border-top: 8px solid var(--line); }
+
+.cards .c-top{
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--muted);
+}
+.cards .card.is-hit .c-top{ color: var(--ink); }
+.cards .c-top .icon{ font-size: 40px; }
+.cards .c-top .tag{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .12em;
+}
+.cards .c-main{
+  font-size: var(--fs-family);
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+}
+.cards .c-sub{
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* 步骤链(三层关系 / 收尾) */
+.steps{
+  display: grid;
+  grid-template-columns: 1fr 88px 1fr 88px 1fr;
+  align-items: stretch;
+}
+.steps .card{
+  padding: 44px 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.steps .s-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .14em;
+  color: var(--muted);
+}
+.steps .s-name{
+  font-size: var(--fs-family);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.steps .s-desc{
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.steps .s-chev{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.steps .s-chev .icon{ font-size: 52px; stroke-width: 1.8; }
+.steps .card.is-brand{ border-top: 8px solid var(--brand, var(--ink)); }
+
+/* ==========================================================================
+   公司页母版 —— 契约第 4 条:栏宽 560 | 64 | 1fr
+   注意:.co-main 是独立元素,不参与 .slide.is-active 的 display 竞争
+   ========================================================================== */
+.co-main{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 560px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+
+.co-id{ display: flex; flex-direction: column; }
+
+.co-logo{
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  background: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-1);
+  margin-bottom: 36px;
+}
+.co-logo svg{ width: 58px; height: 58px; fill: #FFFFFF; }
+
+.co-name{
+  font-size: var(--fs-co);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+.co-meta{
+  margin-top: 24px;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.co-pos{
+  margin-top: 30px;
+  font-size: var(--fs-body);
+  line-height: 1.42;
+  color: var(--ink-2);
+}
+
+/* 右侧型号面板 */
+.co-panel{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--brand);
+  padding: 42px 48px 18px;
+}
+.panel-label{
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+.co-family{
+  margin-top: 12px;
+  font-size: var(--fs-family);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.models{ list-style: none; margin-top: 34px; }
+.model{
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  padding: 26px 0;
+  border-top: 2px solid var(--line-2);
+}
+.model .m-name{
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--fs-model);
+  letter-spacing: -0.01em;
+}
+.model .m-date{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+
+/* ==========================================================================
+   名录网格(3×3,契约:只放序号 + 公司名 + 一个代表型号)
+   ========================================================================== */
+.roster{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+}
+.tile{
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  padding: 26px 28px 28px;
+}
+.t-logo{
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 13px;
+  background: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.t-logo svg{ width: 28px; height: 28px; fill: #FFFFFF; }
+.tile .t-top{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.tile .t-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--brand);
+  letter-spacing: .06em;
+}
+.tile .t-name{
+  font-size: 46px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.tile .t-model{
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 40px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   收尾
+   ========================================================================== */
+.next-up{
+  margin-top: 56px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+.next-up .icon{ font-size: 40px; color: var(--ink); }
+
+/* ==========================================================================
+   放映器 UI(不属于课件内容)
+   ========================================================================== */
+#notes{
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  max-height: 34vh;
+  overflow-y: auto;
+  padding: 18px 26px;
+  background: rgba(20,22,28,.95);
+  color: #F2F2F0;
+  font-family: var(--font-cn);
+  font-size: 16px;
+  line-height: 1.65;
+  display: none;
+  z-index: 20;
+}
+#notes.is-open{ display: block; }
+#notes .hint{ color: #9CA3AF; margin-bottom: 8px; }
+#notes .body{ white-space: pre-wrap; }
+
+#help{
+  position: fixed;
+  right: 14px; top: 14px;
+  padding: 10px 16px;
+  background: rgba(20,22,28,.78);
+  color: #E7E7E4;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.8;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+  z-index: 20;
+}
+#help.is-open{ opacity: 1; }
+
+/* ==========================================================================
+   第二讲:工具页
+   ========================================================================== */
+.tool-main{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 520px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+.tool-id{ display: flex; flex-direction: column; }
+.tool-name{
+  font-size: 84px;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+}
+.tool-by{
+  margin-top: 24px;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+.tool-pos{
+  margin-top: 30px;
+  font-size: var(--fs-body);
+  line-height: 1.42;
+  color: var(--ink-2);
+}
+.tool-forms{
+  margin-top: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* 示意图容器 */
+.diagram-wrap{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--brand);
+  padding: 34px 40px 30px;
+}
+.diagram{ width: 100%; height: auto; display: block; }
+
+/* 示意图图元 —— 全部矢量,不依赖任何图片文件 */
+.diagram .win{ fill: #FFFFFF; stroke: var(--line); stroke-width: 2; }
+.diagram .sep{ stroke: var(--line); stroke-width: 2; }
+.diagram .dot{ fill: var(--line); }
+.diagram .ln{ fill: var(--line-2); }
+.diagram .lnMid{ fill: #DCDCD6; }
+.diagram .lnInk{ fill: var(--ink); }
+.diagram .lnBrand{ fill: var(--brand); }
+.diagram .chip{ fill: #FFFFFF; stroke: var(--line); stroke-width: 2; }
+.diagram .chipOn{ fill: var(--brand); }
+.diagram .arr{ stroke: var(--muted); stroke-width: 3; fill: none;
+                stroke-linecap: round; stroke-linejoin: round; }
+.diagram .arrDash{ stroke: var(--muted); stroke-width: 3; fill: none;
+                   stroke-dasharray: 8 8; stroke-linecap: round; }
+.diagram .lbl{ font-family: var(--font-cn); font-size: 24px; fill: var(--muted); }
+.diagram .lblInk{ font-family: var(--font-mono); font-size: 24px; fill: var(--ink); }
+.diagram .lblChip{ font-family: var(--font-cn); font-size: 26px; fill: var(--ink); }
+.diagram .lblOn{ font-family: var(--font-cn); font-size: 26px; fill: #FFFFFF; }
+
+/* 能力卡 */
+.abilities{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.ability{
+  padding: 40px 36px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ability .a-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--brand);
+}
+.ability .a-name{
+  font-size: 50px;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+}
+.ability .a-desc{
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.for-who{
+  margin-top: 52px;
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+.for-who .k{
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 对照表 */
+.compare{ display: flex; flex-direction: column; }
+.crow{
+  display: grid;
+  grid-template-columns: 84px 250px 260px 1fr;
+  align-items: center;
+  gap: 26px;
+  padding: 18px 0;
+  border-top: 2px solid var(--line-2);
+}
+.crow:first-child{ border-top: 4px solid var(--ink); }
+.crow .c-logo{
+  width: 60px; height: 60px;
+  border-radius: 16px;
+  background: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-1);
+}
+.crow .c-logo svg{ width: 34px; height: 34px; fill: #FFFFFF; }
+.crow .c-name{ font-size: 40px; letter-spacing: -0.02em; }
+.crow .c-form{ font-size: var(--fs-meta); color: var(--muted); }
+.crow .c-one{ font-size: var(--fs-meta); }
+
+/* ==========================================================================
+   第三讲:模型类型
+   ========================================================================== */
+.typegrid{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+.typegrid.cols3{ grid-template-columns: repeat(3, 1fr); }
+
+/* 类型总览:五个类型横排 */
+.typerow{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+.typerow .tr{
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  border-top: 6px solid var(--brand, var(--ink));
+  padding: 28px 24px 30px;
+}
+.typerow .tr .n{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .12em;
+  color: var(--brand, var(--muted));
+}
+.typerow .tr .t{
+  margin-top: 14px;
+  font-size: 38px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.typerow .tr .d{
+  margin-top: 12px;
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* 型号卡:一张卡 = 一个具体型号 + 它的厂商 */
+.tcard{
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  border-top: 6px solid var(--brand);
+  padding: 24px 26px 26px;
+  display: flex;
+  flex-direction: column;
+}
+.tcard .t-model{
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 38px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.tcard .t-vendor{
+  margin-top: 10px;
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.tcard .t-note{
+  margin-top: 10px;
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+/* 对照表里的序号列 */
+.crow .c-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--brand, var(--muted));
+  letter-spacing: .06em;
+}
+.crow .c-model{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+}
+
+/* ==========================================================================
+   第三讲:按「活」选模型
+   ========================================================================== */
+.task-main{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 620px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+
+/* 左栏:这类活长什么样(用真实说法举例) */
+.examples{ display: flex; flex-direction: column; gap: 22px; }
+.examples .ex{
+  display: flex;
+  gap: 18px;
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.examples .ex .m{
+  flex: none;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.dest{
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 2px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  font-size: var(--fs-meta);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.dest .k{
+  flex: none;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+
+/* 右栏:这类活该挑哪几个型号 */
+.picklist{ display: flex; flex-direction: column; gap: 18px; }
+.pick{
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  column-gap: 24px;
+  align-items: center;
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  border-left: 8px solid var(--brand);
+  padding: 20px 30px 20px 24px;
+}
+.pick .p-logo{
+  width: 56px; height: 56px;
+  border-radius: 15px;
+  background: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+}
+.pick .p-logo svg{ width: 32px; height: 32px; fill: #FFFFFF; }
+.pick .p-model{
+  font-family: var(--font-mono);
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.pick .p-why{
+  margin-top: 6px;
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+
+/* 两栏卡片组 */
+.cards.cols2{ grid-template-columns: repeat(2, 1fr); }
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <div id="progress"></div>
+
+  <div class="chrome">
+    <span class="chrome-lesson">有个活要干,挑哪个模型</span>
+    <span class="chrome-right">
+      <span class="chrome-date">信息截至 2026-10</span>
+      <span class="chrome-step" id="pageno">01 / 15</span>
+    </span>
+  </div>
+
+  <!-- ============ 1 / 15 封面 ============ -->
+  <section class="slide cover is-active">
+    <div class="main">
+      <div class="eyebrow" data-anim style="--d:0">5 分钟搞懂</div>
+      <h1 data-anim style="--d:1">有个活要干,<br>该挑哪个模型?</h1>
+      <p class="sub" data-anim style="--d:2">不按名字选,按你要干的活选</p>
+      <div class="stamp" data-anim style="--d:3">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5"/></svg>
+        <span>五个真实场景 · 一张对照表</span>
+      </div>
+    </div>
+    <aside class="notes">
+【封面 · 5 秒】
+今天的问题非常具体:你手上有个活,打开工具让你选模型,选哪个?
+答案是:别看名字,看你要干的活。
+    </aside>
+  </section>
+
+  <!-- ============ 2 / 15 承接 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">三讲连起来看</div>
+      <h2 data-anim style="--d:1">前两讲认了公司和工具,这次认活</h2>
+    </div>
+    <div class="main">
+      <div class="steps">
+        <div class="card" data-anim style="--d:2">
+          <div class="s-num">前面讲过</div>
+          <div class="s-name">公司</div>
+          <div class="s-desc">谁造的模型。已经不会把它和型号弄混</div>
+        </div>
+        <div class="s-chev" data-anim style="--d:3">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
+        </div>
+        <div class="card" data-anim style="--d:4">
+          <div class="s-num">前面讲过</div>
+          <div class="s-name">工具</div>
+          <div class="s-desc">会自己动手的 Agent,和只会聊天的聊天框</div>
+        </div>
+        <div class="s-chev" data-anim style="--d:5">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
+        </div>
+        <div class="card" data-anim style="--d:6">
+          <div class="s-num">今天</div>
+          <div class="s-name">活</div>
+          <div class="s-desc">手上这个具体的活,该交给哪个</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【承接 · 20 秒】
+前两讲解决了两个更靠前的问题:谁造的、包成了什么。
+真正卡住人的是最后一步 —— 我手上有个具体的活,该用哪个?
+今天不讲模型家族,讲活。
+    </aside>
+  </section>
+
+  <!-- ============ 3 / 15 核心反转 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">先说个反常识的</div>
+      <h2 data-anim style="--d:1">大部分人其实不用挑模型</h2>
+      <p class="sub" data-anim style="--d:2">你不是在「挑模型」,你是在某个 Agent 里干活</p>
+    </div>
+    <div class="main">
+      <div class="cards">
+        <div class="card" data-anim style="--d:3">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">事实</span>
+          </div>
+          <div class="c-main">已经在用了</div>
+          <div class="c-sub">大部分工具的默认模型是主力档,日常够用,你根本没注意到它</div>
+        </div>
+        <div class="card is-hit" data-anim style="--d:4">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">更要紧</span>
+          </div>
+          <div class="c-main">把活说清楚</div>
+          <div class="c-sub">这一句说得好不好,差距比换任何一个模型都大</div>
+        </div>
+        <div class="card" data-anim style="--d:5">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">什么时候才挑</span>
+          </div>
+          <div class="c-main">工具让你选时</div>
+          <div class="c-sub">或者你要把 AI 接进自己的工作流,那时候才真需要挑</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【核心反转 · 25 秒】
+这一页是全集最重要的。
+大多数人并不需要「挑模型」—— 你是在某个 Agent 里干活,工具默认给你配好的那个通常就够用。
+比挑模型重要得多的是:**把活说清楚**。
+那什么时候真要挑?一是工具弹出来让你选,二是你要把 AI 接进自己的工作流。
+今天讲的就是这两种时候该怎么办。
+    </aside>
+  </section>
+
+  <!-- ============ 4 / 15 五个真实场景 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">按真实工作场景分</div>
+      <h2 data-anim style="--d:1">普通人的活,就这五种</h2>
+    </div>
+    <div class="main">
+      <div class="typerow">
+        <div class="tr" data-anim style="--d:2">
+          <div class="n">场景一</div>
+          <div class="t">纯对话</div>
+          <div class="d">问问题、查资料、翻译</div>
+        </div>
+        <div class="tr" data-anim style="--d:3">
+          <div class="n">场景二</div>
+          <div class="t">写东西</div>
+          <div class="d">邮件、文案、周报、改稿</div>
+        </div>
+        <div class="tr" data-anim style="--d:4">
+          <div class="n">场景三</div>
+          <div class="t">做 PPT</div>
+          <div class="d">演示文稿、表格、数据整理</div>
+        </div>
+        <div class="tr" data-anim style="--d:5">
+          <div class="n">场景四</div>
+          <div class="t">生图做视频</div>
+          <div class="d">海报、短视频、配音</div>
+        </div>
+        <div class="tr" data-anim style="--d:6">
+          <div class="n">场景五</div>
+          <div class="t">写代码</div>
+          <div class="d">写代码、修 bug、重构</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【五个场景 · 25 秒】
+按普通人的真实工作场景分,就这五种。
+一、纯对话:问问题、查资料、翻译 —— 最常见,也最好办。
+二、写东西:邮件、文案、周报、改稿。
+三、做 PPT 和表格 —— 这一类很多人不知道 AI 已经能直接出文件。
+四、生图、做视频、配音。
+五、写代码 —— 放在最后,因为它离大多数人最远。
+后面五页,一个场景一页。左边是你平时会怎么提这个活,右边是这类活该挑哪几个型号。
+    </aside>
+  </section>
+
+  <!-- ============ 5 / 15 场景一 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">场景一 · 纯对话、问问题</div>
+      <h2 data-anim style="--d:1">最常见,也最好办</h2>
+    </div>
+    <div class="task-main">
+      <div>
+        <div class="examples" data-anim style="--d:2">
+          <div class="ex"><span class="m">—</span><span>「这个政策是什么意思?用大白话讲一遍」</span></div>
+          <div class="ex"><span class="m">—</span><span>「把这段英文翻成中文,专业词保留原文」</span></div>
+          <div class="ex"><span class="m">—</span><span>「这两个概念到底有什么区别?」</span></div>
+        </div>
+        <div class="dest" data-anim style="--d:3">
+          <span class="k">落到哪里</span>
+          <span>任意聊天 App —— ChatGPT、豆包、千问、Kimi 都行,这类不用挑</span>
+        </div>
+      </div>
+      <div class="picklist" data-anim style="--d:4">
+        <div class="pick" style="--brand:var(--brand-openai)">
+          <span class="p-logo"><!--LOGO:openai--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">GPT-6 Astra</span><span class="p-why">OpenAI · 通用能力最强的一档</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-google)">
+          <span class="p-logo"><!--LOGO:google--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Gemini 4 Argon</span><span class="p-why">Google · 能直接读 PDF、图片、音视频</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-deepseek)">
+          <span class="p-logo"><!--LOGO:deepseek--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">DeepSeek V4 Pro</span><span class="p-why">深度求索 · 免费够用,中文日常顺手</span></span>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【场景一 · 25 秒】
+第一个场景,纯对话、问问题,这是最常见的。
+左边三句是你平时大概会怎么说。
+右边三个是这类活里挑得出的:GPT-6 Astra、Gemini 4 Argon、DeepSeek V4 Pro。
+但注意最后那行:这类活**不用挑**,哪个聊天 App 打开就能用。
+    </aside>
+  </section>
+
+  <!-- ============ 6 / 15 场景二 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">场景二 · 写东西、改文字</div>
+      <h2 data-anim style="--d:1">这类活挑「文笔」,不是挑「最强」</h2>
+    </div>
+    <div class="task-main">
+      <div>
+        <div class="examples" data-anim style="--d:2">
+          <div class="ex"><span class="m">—</span><span>「把这封邮件改得客气,但立场要坚定」</span></div>
+          <div class="ex"><span class="m">—</span><span>「把这份会议纪要压成三条结论」</span></div>
+          <div class="ex"><span class="m">—</span><span>「写条朋友圈,别太像广告」</span></div>
+        </div>
+        <div class="dest" data-anim style="--d:3">
+          <span class="k">落到哪里</span>
+          <span>优先用这几个 —— 写字这件事,它们确实更擅长</span>
+        </div>
+      </div>
+      <div class="picklist" data-anim style="--d:4">
+        <div class="pick" style="--brand:var(--brand-anthropic)">
+          <span class="p-logo"><!--LOGO:anthropic--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Claude Opus 5.5</span><span class="p-why">Anthropic · 长文和写作的口碑一直最好</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-openai)">
+          <span class="p-logo"><!--LOGO:openai--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">GPT-6 Astra</span><span class="p-why">OpenAI · 通用强,改稿稳</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-moonshot)">
+          <span class="p-logo"><!--LOGO:moonshot--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m1.053 16.91 9.538 2.55a21 20.981 0 0 0 .06 2.031l5.956 1.592a12 11.99 0 0 1-15.554-6.172m-1.02-5.79 11.352 3.035a21 20.981 0 0 0-.469 2.01l10.817 2.89a12 11.99 0 0 1-1.845 2.004L.658 15.918a12 11.99 0 0 1-.625-4.796m1.593-5.146L13.573 9.17a21 20.981 0 0 0-1.01 1.874l11.297 3.02a21 20.981 0 0 1-.67 2.362l-11.55-3.087L.125 10.26a12 11.99 0 0 1 1.499-4.285ZM6.067 1.58l11.285 3.016a21 20.981 0 0 0-1.688 1.719l7.824 2.091a21 20.981 0 0 1 .513 2.664L2.107 5.218a12 11.99 0 0 1 3.96-3.638M21.68 4.866 7.222 1.003A12 11.99 0 0 1 21.68 4.866"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Kimi K3</span><span class="p-why">月之暗面 · 100 万上下文,整本资料一次读进去</span></span>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【场景二 · 25 秒】
+第二个场景,写东西、改文字。
+这一类有个反直觉的点:**不是挑最强的,是挑文笔最好的**。
+很多人拿最强的模型去改文字,结果出来一股机器味。
+三个里排第一的 Claude 在写作这一项上口碑一直最好;
+Kimi 的特点是 100 万上下文,你可以把整本资料一次丢进去让它写。
+    </aside>
+  </section>
+
+  <!-- ============ 7 / 15 场景三 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">场景三 · 做 PPT、做表格</div>
+      <h2 data-anim style="--d:1">这类活的关键不是模型,是能不能导出文件</h2>
+    </div>
+    <div class="task-main">
+      <div>
+        <div class="examples" data-anim style="--d:2">
+          <div class="ex"><span class="m">—</span><span>「把这份报告变成 10 页 PPT」</span></div>
+          <div class="ex"><span class="m">—</span><span>「把这三个月表合并,算出各月环比」</span></div>
+          <div class="ex"><span class="m">—</span><span>「按这个模板整理成一张周报表格」</span></div>
+        </div>
+        <div class="dest" data-anim style="--d:3">
+          <span class="k">落到哪里</span>
+          <span>Kimi 文档 / 表格、豆包、WorkBuddy —— 关键是能导出 .pptx / .xlsx</span>
+        </div>
+      </div>
+      <div class="picklist" data-anim style="--d:4">
+        <div class="pick" style="--brand:var(--brand-moonshot)">
+          <span class="p-logo"><!--LOGO:moonshot--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m1.053 16.91 9.538 2.55a21 20.981 0 0 0 .06 2.031l5.956 1.592a12 11.99 0 0 1-15.554-6.172m-1.02-5.79 11.352 3.035a21 20.981 0 0 0-.469 2.01l10.817 2.89a12 11.99 0 0 1-1.845 2.004L.658 15.918a12 11.99 0 0 1-.625-4.796m1.593-5.146L13.573 9.17a21 20.981 0 0 0-1.01 1.874l11.297 3.02a21 20.981 0 0 1-.67 2.362l-11.55-3.087L.125 10.26a12 11.99 0 0 1 1.499-4.285ZM6.067 1.58l11.285 3.016a21 20.981 0 0 0-1.688 1.719l7.824 2.091a21 20.981 0 0 1 .513 2.664L2.107 5.218a12 11.99 0 0 1 3.96-3.638M21.68 4.866 7.222 1.003A12 11.99 0 0 1 21.68 4.866"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Kimi K3</span><span class="p-why">月之暗面 · 官方文档:能出 Word / Excel / PPT</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-google)">
+          <span class="p-logo"><!--LOGO:google--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Gemini 4 Argon</span><span class="p-why">Google · 能直接读 PDF,100 万上下文吃得下整份报告</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-anthropic)">
+          <span class="p-logo"><!--LOGO:anthropic--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Claude Opus 5.5</span><span class="p-why">Anthropic · 官方定位含知识工作,长文档整理最稳</span></span>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【场景三 · 25 秒】
+第三个场景,做 PPT、做表格。
+这一类的关键不在模型,而在**工具能不能导出文件** —— 你最后要的是一个 .pptx 或 .xlsx。
+左边三句是你平时怎么提。
+右边三个的共同点是都能吃进长文档:Kimi 官方文档写明能输出 Word、Excel、PPT,
+Gemini 能直接读 PDF,Claude 的官方定位里包含知识工作。
+落到哪里那一行最重要:要挑能导出的那种产品。
+    </aside>
+  </section>
+
+  <!-- ============ 8 / 15 场景四 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">场景四 · 生图、做视频、配音</div>
+      <h2 data-anim style="--d:1">这一类,一个模型通常只干一件事</h2>
+    </div>
+    <div class="task-main">
+      <div>
+        <div class="examples" data-anim style="--d:2">
+          <div class="ex"><span class="m">—</span><span>「做一张产品主图,里面要写清价格」</span></div>
+          <div class="ex"><span class="m">—</span><span>「把这段文字变成 30 秒的视频」</span></div>
+          <div class="ex"><span class="m">—</span><span>「用我的声音把这段稿子读出来」</span></div>
+        </div>
+        <div class="dest" data-anim style="--d:3">
+          <span class="k">落到哪里</span>
+          <span>即梦 / 豆包 / MiniMax —— 先想清楚要产出什么,再找对应的那个</span>
+        </div>
+      </div>
+      <div class="picklist" data-anim style="--d:4">
+        <div class="pick" style="--brand:var(--brand-bytedance)">
+          <span class="p-logo"><!--LOGO:bytedance--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.8772 1.4685L24 2.5326v18.9426l-4.1228 1.0563V1.4685zm-13.3481 9.428l4.115 1.0641v8.9786l-4.115 1.0642v-11.107zM0 2.572l4.115 1.0642v16.7354L0 21.428V2.572zm17.4553 5.6205v11.107l-4.1228-1.0642V9.2568l4.1228-1.0642z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Seedream 5.0 Pro</span><span class="p-why">字节跳动 · 出图,图里还能排文字</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-bytedance)">
+          <span class="p-logo"><!--LOGO:bytedance--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.8772 1.4685L24 2.5326v18.9426l-4.1228 1.0563V1.4685zm-13.3481 9.428l4.115 1.0641v8.9786l-4.115 1.0642v-11.107zM0 2.572l4.115 1.0642v16.7354L0 21.428V2.572zm17.4553 5.6205v11.107l-4.1228-1.0642V9.2568l4.1228-1.0642z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Seedance 2.5</span><span class="p-why">字节跳动 · 出视频,能讲 30 秒的故事</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-minimax)">
+          <span class="p-logo"><!--LOGO:minimax--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.43 3.92a.86.86 0 1 0-1.718 0v14.236a1.999 1.999 0 0 1-3.997 0V9.022a.86.86 0 1 0-1.718 0v3.87a1.999 1.999 0 0 1-3.997 0V11.49a.57.57 0 0 1 1.139 0v1.404a.86.86 0 0 0 1.719 0V9.022a1.999 1.999 0 0 1 3.997 0v9.134a.86.86 0 0 0 1.719 0V3.92a1.998 1.998 0 1 1 3.996 0v11.788a.57.57 0 1 1-1.139 0zm10.572 3.105a2 2 0 0 0-1.999 1.997v7.63a.86.86 0 0 1-1.718 0V3.923a1.999 1.999 0 0 0-3.997 0v16.16a.86.86 0 0 1-1.719 0V18.08a.57.57 0 1 0-1.138 0v2a1.998 1.998 0 0 0 3.996 0V3.92a.86.86 0 0 1 1.719 0v12.73a1.999 1.999 0 0 0 3.996 0V9.023a.86.86 0 1 1 1.72 0v6.686a.57.57 0 0 0 1.138 0V9.022a2 2 0 0 0-1.998-1.997"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">MiniMax Speech 2.8</span><span class="p-why">MiniMax · 出语音,还能克隆音色</span></span>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【场景四 · 25 秒】
+第四个场景,生图、做视频、配音。
+这一类跟前面最大的不同是:**一个模型通常只擅长一件事**。
+Seedream 出图、Seedance 出视频、Speech 出语音,名字都不一样,不能混用。
+所以顺序是:先想清楚要产出什么,再去找对应的那一个。
+    </aside>
+  </section>
+
+  <!-- ============ 9 / 15 场景五 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">场景五 · 写代码、改代码</div>
+      <h2 data-anim style="--d:1">这类别用聊天框,要用会动手的</h2>
+    </div>
+    <div class="task-main">
+      <div>
+        <div class="examples" data-anim style="--d:2">
+          <div class="ex"><span class="m">—</span><span>「给这个项目加一个登录功能」</span></div>
+          <div class="ex"><span class="m">—</span><span>「这段报错什么意思?顺便修了」</span></div>
+          <div class="ex"><span class="m">—</span><span>「把这个模块整个重构一遍」</span></div>
+        </div>
+        <div class="dest" data-anim style="--d:3">
+          <span class="k">落到哪里</span>
+          <span>会动手的那类 Agent:Codex / Claude Code / Trae</span>
+        </div>
+      </div>
+      <div class="picklist" data-anim style="--d:4">
+        <div class="pick" style="--brand:var(--brand-anthropic)">
+          <span class="p-logo"><!--LOGO:anthropic--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">Claude Opus 5.5</span><span class="p-why">Anthropic · 官方定位:长时间自主编程</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-openai)">
+          <span class="p-logo"><!--LOGO:openai--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">GPT-6.1 Sol</span><span class="p-why">OpenAI · 官方说:编程能力接近旗舰</span></span>
+        </div>
+        <div class="pick" style="--brand:var(--brand-minimax)">
+          <span class="p-logo"><!--LOGO:minimax--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.43 3.92a.86.86 0 1 0-1.718 0v14.236a1.999 1.999 0 0 1-3.997 0V9.022a.86.86 0 1 0-1.718 0v3.87a1.999 1.999 0 0 1-3.997 0V11.49a.57.57 0 0 1 1.139 0v1.404a.86.86 0 0 0 1.719 0V9.022a1.999 1.999 0 0 1 3.997 0v9.134a.86.86 0 0 0 1.719 0V3.92a1.998 1.998 0 1 1 3.996 0v11.788a.57.57 0 1 1-1.139 0zm10.572 3.105a2 2 0 0 0-1.999 1.997v7.63a.86.86 0 0 1-1.718 0V3.923a1.999 1.999 0 0 0-3.997 0v16.16a.86.86 0 0 1-1.719 0V18.08a.57.57 0 1 0-1.138 0v2a1.998 1.998 0 0 0 3.996 0V3.92a.86.86 0 0 1 1.719 0v12.73a1.999 1.999 0 0 0 3.996 0V9.023a.86.86 0 1 1 1.72 0v6.686a.57.57 0 0 0 1.138 0V9.022a2 2 0 0 0-1.998-1.997"/></svg><!--/LOGO--></span>
+          <span><span class="p-model">MiniMax M3</span><span class="p-why">MiniMax · 官方主打:前沿编程与 Agent</span></span>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【场景五 · 25 秒】
+最后一个场景,写代码。
+放在最后是因为它离大多数人最远 —— 但如果你要做,有一个坑必须说:
+**别在聊天框里让它写代码**,那样你还得自己复制、自己跑。
+正确做法是用会动手的 Agent,让它直接改文件、跑测试。
+所以这一类的问题不是挑哪个模型,而是先用对工具。
+    </aside>
+  </section>
+
+  <!-- ============ 10 / 15 旋钮 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">场景选完,还有一个旋钮</div>
+      <h2 data-anim style="--d:1">「快省」和「准强」,是一根轴的两端</h2>
+    </div>
+    <div class="main">
+      <div class="abilities">
+        <div class="card ability" data-anim style="--d:2">
+          <div class="a-num">往快省这边</div>
+          <div class="a-name">切轻量档</div>
+          <div class="a-desc">Flash、Luna、Haiku 这类。量大、重复、要批量的活,用它们又快又省</div>
+        </div>
+        <div class="card ability" data-anim style="--d:3">
+          <div class="a-num">往准强这边</div>
+          <div class="a-name">打开思考模式</div>
+          <div class="a-desc">算账、要一次做对、要挑逻辑漏洞的活。让它想久一点再答</div>
+        </div>
+        <div class="card ability" data-anim style="--d:4">
+          <div class="a-num">别两头都要</div>
+          <div class="a-name">没有又最快又最强</div>
+          <div class="a-desc">同一个模型也一样:放松思考强度,它立刻变快变便宜,但也变浅</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【旋钮 · 25 秒】
+场景定完,还有最后一个旋钮。
+「快省」和「准强」是一根轴的两端,不是两个场景。
+往快省这边:切轻量档,Flash、Luna、Haiku 这些,量大重复的活用它们。
+往准强这边:打开思考模式,算账、要一次做对时用。
+最重要的一句:**别指望两头都要**。同一个模型也一样,放松思考强度它立刻变快变便宜,但也变浅。
+    </aside>
+  </section>
+
+  <!-- ============ 11 / 15 三个误区 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">最后排三个雷</div>
+      <h2 data-anim style="--d:1">挑模型最常见的三个误区</h2>
+    </div>
+    <div class="main">
+      <div class="abilities">
+        <div class="card ability" data-anim style="--d:2">
+          <div class="a-num">误区一</div>
+          <div class="a-name">先研究透再上手</div>
+          <div class="a-desc">用三天,胜过读三十篇评测。模型好不好,你自己的活最清楚</div>
+        </div>
+        <div class="card ability" data-anim style="--d:3">
+          <div class="a-num">误区二</div>
+          <div class="a-name">最强就是最适合</div>
+          <div class="a-desc">写字要的是文笔,分类要的是便宜。旗舰在这两件事上都不占优</div>
+        </div>
+        <div class="card ability" data-anim style="--d:4">
+          <div class="a-num">误区三</div>
+          <div class="a-name">换模型能解决问题</div>
+          <div class="a-desc">大多数时候不是模型不行,是话没说到位。先把活说清楚</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【误区 · 20 秒】
+三个误区。
+一、以为要先研究透再上手 —— 用三天胜过读三十篇评测。
+二、以为最强就是最适合 —— 写字要文笔,批量分类要便宜,旗舰在这两件事上都不占优。
+三、以为换个模型就能解决问题 —— 大多数时候是话没说到位。下一页专门讲这个。
+    </aside>
+  </section>
+
+  <!-- ============ 12 / 15 把活说清楚 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">比挑模型重要得多的一步</div>
+      <h2 data-anim style="--d:1">同一件事,两种说法</h2>
+    </div>
+    <div class="main">
+      <div class="cards cols2">
+        <div class="card is-miss" data-anim style="--d:2">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            <span class="tag">说得笼统</span>
+          </div>
+          <div class="c-main">「帮我做份 PPT」</div>
+          <div class="c-sub">它只能给你一堆正确的废话,你还得从头改一遍</div>
+        </div>
+        <div class="card is-hit" data-anim style="--d:3">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">说得具体</span>
+          </div>
+          <div class="c-main">「做份季度复盘 PPT」</div>
+          <div class="c-sub">再加三句:10 页、给老板看、重点讲没完成的部分和原因 —— 大概率直接能用</div>
+        </div>
+      </div>
+      <div class="for-who" data-anim style="--d:4">
+        <span class="k">说清楚三件事</span>
+        <span>给谁看 · 要什么格式 · 什么时候用</span>
+      </div>
+    </div>
+    <aside class="notes">
+【把活说清楚 · 25 秒】
+这一页比整集其他内容都值钱。
+同一件事,两种说法。左边那种,它只能给你一堆正确的废话。
+右边那种 —— 补上页数、给谁看、什么重点 —— 大概率直接能用。
+所以别再问「哪个模型最强」了,先问自己:这个活我说清楚了吗?
+    </aside>
+  </section>
+
+  <!-- ============ 13 / 15 对照表 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">一张图带走</div>
+      <h2 data-anim style="--d:1">五个场景,各挑一个</h2>
+    </div>
+    <div class="main">
+      <div class="compare">
+        <div class="crow" data-anim style="--d:2">
+          <span class="c-num">01</span>
+          <span class="c-name">纯对话</span>
+          <span class="c-model">GPT-6 Astra</span>
+          <span class="c-one">哪个聊天 App 都行 —— 不用操心挑</span>
+        </div>
+        <div class="crow" data-anim style="--d:3">
+          <span class="c-num">02</span>
+          <span class="c-name">写东西</span>
+          <span class="c-model">Claude Opus 5.5</span>
+          <span class="c-one">挑文笔,不是挑最强</span>
+        </div>
+        <div class="crow" data-anim style="--d:4">
+          <span class="c-num">03</span>
+          <span class="c-name">做 PPT 表格</span>
+          <span class="c-model">Kimi K3</span>
+          <span class="c-one">关键在能不能导出 .pptx / .xlsx</span>
+        </div>
+        <div class="crow" data-anim style="--d:5">
+          <span class="c-num">04</span>
+          <span class="c-name">生图做视频</span>
+          <span class="c-model">Seedance 2.5</span>
+          <span class="c-one">一个模型只干一件事,先定产出什么</span>
+        </div>
+        <div class="crow" data-anim style="--d:6">
+          <span class="c-num">05</span>
+          <span class="c-name">写代码</span>
+          <span class="c-model">Claude Opus 5.5</span>
+          <span class="c-one">别用聊天框,用会动手的 Agent</span>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【对照表 · 25 秒】
+建议暂停截图。
+口播只念每行最后那半句:不用操心挑、挑文笔不是挑最强、关键在能不能导出、
+一个模型只干一件事、别用聊天框。
+型号名字不用念 —— 名字会换,这五句话不会换。
+    </aside>
+  </section>
+
+  <!-- ============ 14 / 15 三步流程 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">照这个顺序问自己</div>
+      <h2 data-anim style="--d:1">三步,把活变成选择</h2>
+    </div>
+    <div class="main">
+      <div class="steps">
+        <div class="card" data-anim style="--d:2">
+          <div class="s-num">第一步</div>
+          <div class="s-name">把活说清楚</div>
+          <div class="s-desc">给谁看、要什么格式、多长。这一步做完,已经解决了一大半</div>
+        </div>
+        <div class="s-chev" data-anim style="--d:3">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
+        </div>
+        <div class="card" data-anim style="--d:4">
+          <div class="s-num">第二步</div>
+          <div class="s-name">对号入座</div>
+          <div class="s-desc">它属于五个场景里的哪一个?对话、写字、做 PPT、生图视频、还是写代码</div>
+        </div>
+        <div class="s-chev" data-anim style="--d:5">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
+        </div>
+        <div class="card" data-anim style="--d:6">
+          <div class="s-num">第三步</div>
+          <div class="s-name">定快省还是准强</div>
+          <div class="s-desc">日常小事往快省调,要一次做对就往准强调。这个旋钮比换模型管用</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【流程 · 25 秒】
+把今天讲的压成三步。
+第一步,把活说清楚 —— 这一步做完,问题已经解决一大半。
+第二步,对号入座,看它属于五个场景里的哪一个。
+第三步,定这根旋钮:往快省调还是往准强调。
+注意:整个流程里,「挑哪个具体型号」根本不在前三步。
+    </aside>
+  </section>
+
+  <!-- ============ 15 / 15 收尾 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">今天就记一句话</div>
+      <h2 data-anim style="--d:1">你要练的不是挑模型,是说清楚活</h2>
+    </div>
+    <div class="main">
+      <div class="cards">
+        <div class="card" data-anim style="--d:2">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">不用记</span>
+          </div>
+          <div class="c-main">型号名</div>
+          <div class="c-sub">三个月换一批,记了也会过期</div>
+        </div>
+        <div class="card is-hit" data-anim style="--d:3">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">要记</span>
+          </div>
+          <div class="c-main">五个场景</div>
+          <div class="c-sub">对号入座就够了,具体型号让工具自己去配</div>
+        </div>
+        <div class="card" data-anim style="--d:4">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+            <span class="tag">下一集</span>
+          </div>
+          <div class="c-main">来实测</div>
+          <div class="c-sub">同一个活交给不同的模型,结果到底差多少</div>
+        </div>
+      </div>
+      <div class="next-up" data-anim style="--d:5">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+        <span>下一集:同一个活交给不同的模型,结果差多少?</span>
+      </div>
+    </div>
+    <aside class="notes">
+【收尾 · 20 秒】
+今天就记一句话:你要练的不是挑模型,是说清楚活。
+型号名不用记,三个月换一批;五个场景要记住,对号入座就够了。
+下一集我们做实测:同一个活交给不同的模型,结果到底差多少。
+    </aside>
+  </section>
+
+</div>
+
+<div id="notes"><div class="hint">口播备注(N 键开关,录制时请关闭)</div><div class="body"></div></div>
+<div id="help">→ / 空格 / 滚轮　　下一页<br>←　　上一页<br>F　全屏<br>N　口播备注<br>鼠标:左 15% 上一页,其余下一页</div>
+
+<script id="deck-js">
+/* ==========================================================================
+   deck.js — 放映器 v1.1(契约第 8 条)
+   无依赖、离线可用(file:// 直接双击打开也没问题)
+   键盘:← → 空格 Home End F N ?   /   滚轮上下 / 鼠标左右半边点击
+   v1.1 修复:history.replaceState 在 file:// 下会抛异常,已加 try/catch
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var STAGE_W = 1920;
+  var STAGE_H = 1080;
+
+  var stage    = document.getElementById('stage');
+  var slides   = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var progress = document.getElementById('progress');
+  var pageno   = document.getElementById('pageno');
+  var notesBox = document.getElementById('notes');
+  var notesBody= notesBox ? notesBox.querySelector('.body') : null;
+  var help     = document.getElementById('help');
+
+  if (!stage || !slides.length) return;
+
+  var index = 0;
+
+  /* ---------- 舞台缩放:内容永不回流 ---------- */
+  function fit() {
+    var s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+    stage.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---------- 翻页节流:防止一次滚动/点击连翻多页 ---------- */
+  var LOCK_MS = 300;
+  var lockedAt = 0;
+  function lock()  { lockedAt = Date.now(); }
+  function locked(){ return (Date.now() - lockedAt) < LOCK_MS; }
+
+  function pad2(n) { return n < 10 ? '0' + n : String(n); }
+
+  /* ---------- 渲染 ---------- */
+  function render() {
+    slides.forEach(function (el, i) {
+      el.classList.toggle('is-active', i === index);
+      if (i === index) {
+        // 重放进场动效
+        Array.prototype.forEach.call(el.querySelectorAll('[data-anim]'), function (n) {
+          n.style.animation = 'none';
+          void n.offsetHeight;          // 强制重排,让动画重新开始
+          n.style.animation = '';
+        });
+      }
+    });
+
+    if (pageno)   pageno.textContent = pad2(index + 1) + ' / ' + pad2(slides.length);
+    if (progress) progress.style.width = ((index + 1) / slides.length * 100) + '%';
+
+    if (notesBody) {
+      var aside = slides[index].querySelector('.notes');
+      notesBody.textContent = aside ? aside.textContent.trim() : '(本页无备注)';
+    }
+
+    // file:// 下 Chrome 会禁止 replaceState,必须吞掉这个异常
+    try {
+      if (location.hash !== '#' + (index + 1)) {
+        history.replaceState(null, '', '#' + (index + 1));
+      }
+    } catch (e) { /* file:// 下正常,忽略 */ }
+  }
+
+  function go(next) {
+    if (next < 0 || next >= slides.length || next === index) return;
+    index = next;
+    render();
+  }
+
+  /* ---------- 键盘 ---------- */
+  document.addEventListener('keydown', function (e) {
+    switch (e.key) {
+      case 'ArrowRight': case ' ': case 'PageDown': case 'Enter':
+        e.preventDefault(); go(index + 1); break;
+      case 'ArrowLeft': case 'PageUp': case 'Backspace':
+        e.preventDefault(); go(index - 1); break;
+      case 'Home': e.preventDefault(); go(0); break;
+      case 'End':  e.preventDefault(); go(slides.length - 1); break;
+      case 'f': case 'F':
+        e.preventDefault();
+        if (document.fullscreenElement) { document.exitFullscreen(); }
+        else if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen();
+        }
+        break;
+      case 'n': case 'N':
+        e.preventDefault();
+        if (notesBox) notesBox.classList.toggle('is-open');
+        break;
+      case '?': case 'h': case 'H':
+        e.preventDefault();
+        if (help) help.classList.toggle('is-open');
+        break;
+    }
+  });
+
+  /* ---------- 滚轮翻页(累加 + 节流,兼容滚轮与触控板)---------- */
+  var acc = 0, accTimer = null;
+
+  function inPanel(node) {
+    if (!node || !node.closest) return false;
+    return !!node.closest('#notes, #help');
+  }
+
+  window.addEventListener('wheel', function (e) {
+    if (inPanel(e.target)) return;
+
+    acc += e.deltaY;
+    if (accTimer) clearTimeout(accTimer);
+    accTimer = setTimeout(function () { acc = 0; }, 200);
+
+    if (locked()) return;
+    if (Math.abs(acc) < 48) return;
+
+    var dir = acc > 0 ? 1 : -1;
+    acc = 0;
+    lock();
+    go(index + dir);
+  }, { passive: true });
+
+  /* ---------- 鼠标翻页:左 15% 上一页,其余下一页 ---------- */
+  document.addEventListener('click', function (e) {
+    if (inPanel(e.target)) return;
+    if (locked()) return;
+    lock();
+    var ratio = e.clientX / window.innerWidth;
+    go(index + (ratio < 0.15 ? -1 : 1));
+  });
+
+  /* ---------- 初始页:支持 lesson-01.html#7 直接跳页 ---------- */
+  var h = parseInt((location.hash || '').replace('#', ''), 10);
+  if (!isNaN(h) && h >= 1 && h <= slides.length) index = h - 1;
+
+  render();
+})();
+</script>
+</body>
+</html>

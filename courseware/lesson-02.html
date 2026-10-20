@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>会自己动手的 AI:五家公司的工具</title>
+<style id="deck-css">
+/* ==========================================================================
+   deck.css — AI 科普课件设计系统 v2.0
+   契约见 ../../contract.md。改这里之后必须跑 build.ps1 重新内联。
+
+   v2.0 相对 v1.0 的变化:
+     · 取消「底部 200px 全空」(依据错误,见契约第 1 条),改为只避开右下角死区
+     · 新增固定顶栏(chrome)+ 页脚锚点带,把页面上下都填满
+     · 新增卡片系统(阴影 / 圆角 / 品牌色顶边 / 序号徽章)
+     · 内容区垂直居中,空白均匀分布在上下,不再全堆在底部
+   ========================================================================== */
+
+:root{
+  /* ---- 画布 ---- */
+  --stage-w: 1920px;
+  --stage-h: 1080px;
+  --pad-x: 96px;
+  --chrome-top: 44px;      /* 顶栏距舞台顶部 */
+  --chrome-h: 52px;        /* 顶栏高度 */
+  --pad-top: 132px;        /* 内容区上边 = chrome-top + chrome-h + 间距 */
+  --pad-bottom: 64px;
+
+  /* ---- 颜色 ---- */
+  --bg-1:    #FBFBF9;
+  --bg-2:    #F4F4F1;
+  --card:    #FFFFFF;
+  --ink:     #14161C;
+  --ink-2:   #3A3F4A;
+  --muted:   #767C88;
+  --line:    #E2E2DC;
+  --line-2:  #EFEFEA;
+
+  /* ---- 深度 ---- */
+  --shadow-1: 0 1px 2px rgba(20,22,28,.04), 0 8px 24px rgba(20,22,28,.06);
+  --shadow-2: 0 2px 8px rgba(20,22,28,.06), 0 20px 48px rgba(20,22,28,.10);
+  --r-lg: 24px;
+  --r-md: 16px;
+  --r-sm: 10px;
+
+  /* ---- 字体 ---- */
+  --font-cn: "PingFang SC", "HarmonyOS Sans SC", "Source Han Sans SC",
+             "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular",
+               "Consolas", "Courier New", monospace;
+
+  /* ---- 字号阶梯(契约第 2 条,不得下调)---- */
+  --fs-cover:  132px;
+  --fs-h1:      92px;
+  --fs-co:      88px;
+  --fs-family:  64px;
+  --fs-model:   46px;
+  --fs-body:    44px;   /* 正文下限 */
+  --fs-meta:    34px;
+  --fs-label:   28px;
+
+  --rise: 320ms;
+
+  /* ---- 品牌色(契约第 6 条,改色只改这里)----
+     全部取自 simple-icons 官方库,已逐个核实。
+     注意 xAI 与月之暗面的官方色都是纯黑 —— 靠图标区分,不要为了好看改色。
+     若想用 Claude 产品线的珊瑚色替换 Anthropic 企业色:#191919 -> #D97757 */
+  --brand-openai:    #412991;  /* ✅ */
+  --brand-anthropic: #191919;  /* ✅ 企业色(Claude 产品线为 #D97757) */
+  --brand-google:    #4285F4;  /* ✅ */
+  --brand-xai:       #000000;  /* ✅ */
+  --brand-deepseek:  #5786FE;  /* ✅ 修正:此前误填 #4D6BFE */
+  --brand-moonshot:  #000000;  /* ✅ */
+  --brand-alibaba:   #FF6A00;  /* ✅ */
+  --brand-minimax:   #E73562;  /* ✅ 修正:此前误判为黑色 */
+  --brand-bytedance: #3C8CFF;  /* ✅ */
+
+  /* ---- 第二讲:工具品牌色 ---- */
+  --brand-tool-codex:      var(--brand-openai);    /* Codex 用 OpenAI 标记 */
+  --brand-tool-claudecode: #D97757;                /* ✅ Claude 产品线珊瑚色 */
+  --brand-tool-trae:       #32F08C;                /* ✅ simple-icons: trae */
+  --brand-tool-workbuddy:  #0EC8A9;                /* ✅ 取自官方 logo 渐变起点 */
+  --brand-tool-dsh:        var(--brand-deepseek);  /* DeepSeek Harness */
+}
+
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body{
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #14161C;
+  color: var(--ink);
+  font-family: var(--font-cn);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ==========================================================================
+   舞台
+   ========================================================================== */
+#stage{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  transform-origin: center center;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+}
+
+.slide{
+  position: absolute;
+  inset: 0;
+  padding: var(--pad-top) var(--pad-x) var(--pad-bottom);
+  display: none;
+  flex-direction: column;
+}
+.slide.is-active{ display: flex; }
+
+/* ---------- 固定顶栏(chrome,所有页共用)---------- */
+.chrome{
+  position: absolute;
+  left: var(--pad-x);
+  right: var(--pad-x);
+  top: var(--chrome-top);
+  height: var(--chrome-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--line);
+  z-index: 6;
+}
+.chrome-lesson{
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+.chrome-step{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  letter-spacing: .06em;
+}
+.chrome-right{
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+.chrome-date{
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  letter-spacing: .08em;
+}
+
+#progress{
+  position: absolute;
+  left: 0; top: 0;
+  height: 5px;
+  width: 0;
+  background: var(--ink);
+  transition: width 220ms ease;
+  z-index: 8;
+}
+
+/* ==========================================================================
+   动效 —— 契约第 7 条
+   ========================================================================== */
+@keyframes rise{
+  from{ opacity: 0; transform: translateY(10px); }
+  to  { opacity: 1; transform: translateY(0); }
+}
+.slide.is-active [data-anim]{
+  animation: rise var(--rise) cubic-bezier(.22,.61,.36,1) both;
+  animation-delay: calc(var(--d, 0) * 60ms);
+}
+@media (prefers-reduced-motion: reduce){
+  .slide.is-active [data-anim]{ animation: none; }
+}
+
+.mono{ font-family: var(--font-mono); }
+
+.icon{
+  width: 1em; height: 1em;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* ==========================================================================
+   通用标题块
+   ========================================================================== */
+.title-block{ margin-bottom: 56px; }
+.slide.tight .title-block{ margin-bottom: 28px; }
+.kicker{
+  font-size: var(--fs-label);
+  letter-spacing: .18em;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.title-block h2{
+  font-size: var(--fs-h1);
+  line-height: 1.14;
+  letter-spacing: -0.02em;
+}
+.title-block .sub{
+  margin-top: 24px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+
+/* 内容区:垂直居中,空白均匀分上下 */
+.main{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   封面
+   ========================================================================== */
+.cover .main{ justify-content: center; }
+.cover .eyebrow{
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  align-self: flex-start;
+  padding: 12px 22px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  margin-bottom: 48px;
+}
+.cover h1{
+  font-size: var(--fs-cover);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  max-width: 1560px;
+}
+.cover .sub{
+  margin-top: 44px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+.cover .stamp{
+  margin-top: 56px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   卡片系统
+   ========================================================================== */
+.card{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.pill{
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: #F1F1ED;
+  background: color-mix(in srgb, var(--brand, #767C88) 12%, #FFFFFF);
+  color: var(--ink-2);
+  font-size: var(--fs-label);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+
+/* ==========================================================================
+   并列卡片组(钩子页 / 步骤页)
+   ========================================================================== */
+.cards{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+.cards .card{
+  padding: 44px 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.cards .card.is-hit{
+  box-shadow: var(--shadow-2);
+  border-top: 8px solid var(--ink);
+}
+.cards .card.is-miss{ border-top: 8px solid var(--line); }
+
+.cards .c-top{
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--muted);
+}
+.cards .card.is-hit .c-top{ color: var(--ink); }
+.cards .c-top .icon{ font-size: 40px; }
+.cards .c-top .tag{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .12em;
+}
+.cards .c-main{
+  font-size: var(--fs-family);
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+}
+.cards .c-sub{
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* 步骤链(三层关系 / 收尾) */
+.steps{
+  display: grid;
+  grid-template-columns: 1fr 88px 1fr 88px 1fr;
+  align-items: stretch;
+}
+.steps .card{
+  padding: 44px 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.steps .s-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .14em;
+  color: var(--muted);
+}
+.steps .s-name{
+  font-size: var(--fs-family);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.steps .s-desc{
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.steps .s-chev{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.steps .s-chev .icon{ font-size: 52px; stroke-width: 1.8; }
+.steps .card.is-brand{ border-top: 8px solid var(--brand, var(--ink)); }
+
+/* ==========================================================================
+   公司页母版 —— 契约第 4 条:栏宽 560 | 64 | 1fr
+   注意:.co-main 是独立元素,不参与 .slide.is-active 的 display 竞争
+   ========================================================================== */
+.co-main{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 560px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+
+.co-id{ display: flex; flex-direction: column; }
+
+.co-logo{
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  background: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-1);
+  margin-bottom: 36px;
+}
+.co-logo svg{ width: 58px; height: 58px; fill: #FFFFFF; }
+
+.co-name{
+  font-size: var(--fs-co);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+.co-meta{
+  margin-top: 24px;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.co-pos{
+  margin-top: 30px;
+  font-size: var(--fs-body);
+  line-height: 1.42;
+  color: var(--ink-2);
+}
+
+/* 右侧型号面板 */
+.co-panel{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--brand);
+  padding: 42px 48px 18px;
+}
+.panel-label{
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+.co-family{
+  margin-top: 12px;
+  font-size: var(--fs-family);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.models{ list-style: none; margin-top: 34px; }
+.model{
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  padding: 26px 0;
+  border-top: 2px solid var(--line-2);
+}
+.model .m-name{
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--fs-model);
+  letter-spacing: -0.01em;
+}
+.model .m-date{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+
+/* ==========================================================================
+   名录网格(3×3,契约:只放序号 + 公司名 + 一个代表型号)
+   ========================================================================== */
+.roster{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+}
+.tile{
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  padding: 26px 28px 28px;
+}
+.t-logo{
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 13px;
+  background: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.t-logo svg{ width: 28px; height: 28px; fill: #FFFFFF; }
+.tile .t-top{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.tile .t-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--brand);
+  letter-spacing: .06em;
+}
+.tile .t-name{
+  font-size: 46px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.tile .t-model{
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 40px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   收尾
+   ========================================================================== */
+.next-up{
+  margin-top: 56px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+.next-up .icon{ font-size: 40px; color: var(--ink); }
+
+/* ==========================================================================
+   放映器 UI(不属于课件内容)
+   ========================================================================== */
+#notes{
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  max-height: 34vh;
+  overflow-y: auto;
+  padding: 18px 26px;
+  background: rgba(20,22,28,.95);
+  color: #F2F2F0;
+  font-family: var(--font-cn);
+  font-size: 16px;
+  line-height: 1.65;
+  display: none;
+  z-index: 20;
+}
+#notes.is-open{ display: block; }
+#notes .hint{ color: #9CA3AF; margin-bottom: 8px; }
+#notes .body{ white-space: pre-wrap; }
+
+#help{
+  position: fixed;
+  right: 14px; top: 14px;
+  padding: 10px 16px;
+  background: rgba(20,22,28,.78);
+  color: #E7E7E4;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.8;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+  z-index: 20;
+}
+#help.is-open{ opacity: 1; }
+
+/* ==========================================================================
+   第二讲:工具页
+   ========================================================================== */
+.tool-main{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 520px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+.tool-id{ display: flex; flex-direction: column; }
+.tool-name{
+  font-size: 84px;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+}
+.tool-by{
+  margin-top: 24px;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+.tool-pos{
+  margin-top: 30px;
+  font-size: var(--fs-body);
+  line-height: 1.42;
+  color: var(--ink-2);
+}
+.tool-forms{
+  margin-top: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* 示意图容器 */
+.diagram-wrap{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--brand);
+  padding: 34px 40px 30px;
+}
+.diagram{ width: 100%; height: auto; display: block; }
+
+/* 示意图图元 —— 全部矢量,不依赖任何图片文件 */
+.diagram .win{ fill: #FFFFFF; stroke: var(--line); stroke-width: 2; }
+.diagram .sep{ stroke: var(--line); stroke-width: 2; }
+.diagram .dot{ fill: var(--line); }
+.diagram .ln{ fill: var(--line-2); }
+.diagram .lnMid{ fill: #DCDCD6; }
+.diagram .lnInk{ fill: var(--ink); }
+.diagram .lnBrand{ fill: var(--brand); }
+.diagram .chip{ fill: #FFFFFF; stroke: var(--line); stroke-width: 2; }
+.diagram .chipOn{ fill: var(--brand); }
+.diagram .arr{ stroke: var(--muted); stroke-width: 3; fill: none;
+                stroke-linecap: round; stroke-linejoin: round; }
+.diagram .arrDash{ stroke: var(--muted); stroke-width: 3; fill: none;
+                   stroke-dasharray: 8 8; stroke-linecap: round; }
+.diagram .lbl{ font-family: var(--font-cn); font-size: 24px; fill: var(--muted); }
+.diagram .lblInk{ font-family: var(--font-mono); font-size: 24px; fill: var(--ink); }
+.diagram .lblChip{ font-family: var(--font-cn); font-size: 26px; fill: var(--ink); }
+.diagram .lblOn{ font-family: var(--font-cn); font-size: 26px; fill: #FFFFFF; }
+
+/* 能力卡 */
+.abilities{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.ability{
+  padding: 40px 36px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ability .a-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--brand);
+}
+.ability .a-name{
+  font-size: 50px;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+}
+.ability .a-desc{
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.for-who{
+  margin-top: 52px;
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+.for-who .k{
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 对照表 */
+.compare{ display: flex; flex-direction: column; }
+.crow{
+  display: grid;
+  grid-template-columns: 84px 250px 260px 1fr;
+  align-items: center;
+  gap: 26px;
+  padding: 18px 0;
+  border-top: 2px solid var(--line-2);
+}
+.crow:first-child{ border-top: 4px solid var(--ink); }
+.crow .c-logo{
+  width: 60px; height: 60px;
+  border-radius: 16px;
+  background: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-1);
+}
+.crow .c-logo svg{ width: 34px; height: 34px; fill: #FFFFFF; }
+.crow .c-name{ font-size: 40px; letter-spacing: -0.02em; }
+.crow .c-form{ font-size: var(--fs-meta); color: var(--muted); }
+.crow .c-one{ font-size: var(--fs-meta); }
+
+/* ==========================================================================
+   第三讲:模型类型
+   ========================================================================== */
+.typegrid{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+.typegrid.cols3{ grid-template-columns: repeat(3, 1fr); }
+
+/* 类型总览:五个类型横排 */
+.typerow{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+.typerow .tr{
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  border-top: 6px solid var(--brand, var(--ink));
+  padding: 28px 24px 30px;
+}
+.typerow .tr .n{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .12em;
+  color: var(--brand, var(--muted));
+}
+.typerow .tr .t{
+  margin-top: 14px;
+  font-size: 38px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.typerow .tr .d{
+  margin-top: 12px;
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* 型号卡:一张卡 = 一个具体型号 + 它的厂商 */
+.tcard{
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  border-top: 6px solid var(--brand);
+  padding: 24px 26px 26px;
+  display: flex;
+  flex-direction: column;
+}
+.tcard .t-model{
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 38px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.tcard .t-vendor{
+  margin-top: 10px;
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.tcard .t-note{
+  margin-top: 10px;
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+/* 对照表里的序号列 */
+.crow .c-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--brand, var(--muted));
+  letter-spacing: .06em;
+}
+.crow .c-model{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+}
+
+/* ==========================================================================
+   第三讲:按「活」选模型
+   ========================================================================== */
+.task-main{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 620px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+
+/* 左栏:这类活长什么样(用真实说法举例) */
+.examples{ display: flex; flex-direction: column; gap: 22px; }
+.examples .ex{
+  display: flex;
+  gap: 18px;
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.examples .ex .m{
+  flex: none;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.dest{
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 2px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  font-size: var(--fs-meta);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.dest .k{
+  flex: none;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+
+/* 右栏:这类活该挑哪几个型号 */
+.picklist{ display: flex; flex-direction: column; gap: 18px; }
+.pick{
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  column-gap: 24px;
+  align-items: center;
+  background: var(--card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  border-left: 8px solid var(--brand);
+  padding: 20px 30px 20px 24px;
+}
+.pick .p-logo{
+  width: 56px; height: 56px;
+  border-radius: 15px;
+  background: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+}
+.pick .p-logo svg{ width: 32px; height: 32px; fill: #FFFFFF; }
+.pick .p-model{
+  font-family: var(--font-mono);
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.pick .p-why{
+  margin-top: 6px;
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+
+/* 两栏卡片组 */
+.cards.cols2{ grid-template-columns: repeat(2, 1fr); }
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <div id="progress"></div>
+
+  <div class="chrome">
+    <span class="chrome-lesson">会自己动手的 AI</span>
+    <span class="chrome-right">
+      <span class="chrome-date">信息截至 2026-10</span>
+      <span class="chrome-step" id="pageno">01 / 15</span>
+    </span>
+  </div>
+
+  <!-- ============ 1 / 15 封面 ============ -->
+  <section class="slide cover is-active">
+    <div class="main">
+      <div class="eyebrow" data-anim style="--d:0">5 分钟搞懂</div>
+      <h1 data-anim style="--d:1">会自己动手的 AI,<br>到底长什么样?</h1>
+      <p class="sub" data-anim style="--d:2">Codex · Claude Code · Trae · WorkBuddy · DeepSeek Harness</p>
+      <div class="stamp" data-anim style="--d:3">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5"/></svg>
+        <span>它们和聊天框不是一回事</span>
+      </div>
+    </div>
+    <aside class="notes">
+【封面 · 5 秒】
+上一集讲的是公司和模型。这一集讲模型被做成了什么工具。
+不念标题,直接进内容。
+    </aside>
+  </section>
+
+  <!-- ============ 2 / 15 承接上集 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">接着上一集</div>
+      <h2 data-anim style="--d:1">上次讲到两层,今天补第三层</h2>
+      <p class="sub" data-anim style="--d:2">上一集是「谁造的」,这一集是「它被做成了什么」</p>
+    </div>
+    <div class="main">
+      <div class="steps">
+        <div class="card" data-anim style="--d:3">
+          <div class="s-num">第一层</div>
+          <div class="s-name">公司</div>
+          <div class="s-desc">OpenAI、Anthropic、字节跳动、腾讯</div>
+        </div>
+        <div class="s-chev" data-anim style="--d:4">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
+        </div>
+        <div class="card" data-anim style="--d:5">
+          <div class="s-num">第二层</div>
+          <div class="s-name">模型</div>
+          <div class="s-desc">GPT-6、Claude、Seed —— 上一集讲过</div>
+        </div>
+        <div class="s-chev" data-anim style="--d:6">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
+        </div>
+        <div class="card" data-anim style="--d:7">
+          <div class="s-num">第三层</div>
+          <div class="s-name">工具</div>
+          <div class="s-desc">同一个模型,可以包成完全不同的工具</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【承接 · 20 秒】
+上一集讲了公司和模型的关系。今天补第三层:工具。
+同一个模型,可以包成聊天框,也可以包成会自己动手的 agent。
+这就是为什么「都是 GPT」的产品,用起来差别那么大。
+    </aside>
+  </section>
+
+  <!-- ============ 3 / 15 关键区分 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">今天最重要的一页</div>
+      <h2 data-anim style="--d:1">聊天框 和 干活工具,是两回事</h2>
+    </div>
+    <div class="main">
+      <div class="cards">
+        <div class="card is-miss" data-anim style="--d:2">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            <span class="tag">聊天框</span>
+          </div>
+          <div class="c-main">你问,它答</div>
+          <div class="c-sub">它给你文字,复制粘贴还得你自己来</div>
+        </div>
+        <div class="card is-hit" data-anim style="--d:3">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">干活工具</span>
+          </div>
+          <div class="c-main">你交代,它动手</div>
+          <div class="c-sub">它自己读文件、改文件、跑命令、看结果</div>
+        </div>
+        <div class="card" data-anim style="--d:4">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+            <span class="tag">差别</span>
+          </div>
+          <div class="c-main">顾问 vs 实习生</div>
+          <div class="c-sub">一个只出主意,一个真的把活干完</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【核心区分 · 25 秒】
+这一页是全集的重点。
+聊天框:它给你一段文字,剩下的活还得你自己干。
+干活工具:你说一句,它自己去读文件、改文件、跑命令、看结果,不行再改。
+一个像顾问,一个像实习生。今天讲的五个,全是后者。
+    </aside>
+  </section>
+
+  <!-- ============ 4 / 15 Codex 是什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-codex)">
+    <div class="tool-main">
+      <div class="tool-id">
+        <div class="co-logo" data-anim style="--d:0"><!--LOGO:codex--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></div>
+        <h2 class="tool-name" data-anim style="--d:1">Codex</h2>
+        <p class="tool-by" data-anim style="--d:2">OpenAI 出品</p>
+        <p class="tool-pos" data-anim style="--d:3">OpenAI 自己的编程 agent,一个产品四种用法</p>
+        <div class="tool-forms" data-anim style="--d:4">
+          <span class="pill">终端</span>
+          <span class="pill">桌面 App</span>
+          <span class="pill">云端</span>
+          <span class="pill">IDE 插件</span>
+        </div>
+      </div>
+      <div class="diagram-wrap" data-anim style="--d:5">
+        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
+          <rect class="win" x="16" y="30" width="424" height="340" rx="16"/>
+          <line class="sep" x1="16" y1="78" x2="440" y2="78"/>
+          <circle class="dot" cx="44" cy="54" r="6"/>
+          <circle class="dot" cx="66" cy="54" r="6"/>
+          <circle class="dot" cx="88" cy="54" r="6"/>
+          <text class="lblInk" x="40" y="124">$ codex "重构这个模块"</text>
+          <rect class="ln" x="40" y="148" width="300" height="12" rx="6"/>
+          <rect class="ln" x="40" y="176" width="352" height="12" rx="6"/>
+          <rect class="ln" x="40" y="204" width="236" height="12" rx="6"/>
+          <rect class="lnInk" x="40" y="244" width="330" height="12" rx="6"/>
+          <rect class="ln" x="40" y="272" width="190" height="12" rx="6"/>
+          <text class="lbl" x="40" y="342">它自己改文件、跑测试</text>
+          <rect class="chip chipOn" x="472" y="30" width="272" height="72" rx="14"/>
+          <text class="lblOn" x="500" y="76">终端 CLI</text>
+          <rect class="chip" x="472" y="118" width="272" height="72" rx="14"/>
+          <text class="lblChip" x="500" y="164">桌面 App</text>
+          <rect class="chip" x="472" y="206" width="272" height="72" rx="14"/>
+          <text class="lblChip" x="500" y="252">云端</text>
+          <rect class="chip" x="472" y="294" width="272" height="72" rx="14"/>
+          <text class="lblChip" x="500" y="340">IDE 插件</text>
+        </svg>
+      </div>
+    </div>
+    <aside class="notes">
+【Codex · 20 秒】
+第一个,OpenAI 的 Codex。
+它不是一个软件,而是一条产品线,四种用法:终端、桌面 App、云端、IDE 插件。
+左边这个终端就是最常用的形态 —— 你打一句中文,它自己改文件、跑测试。
+    </aside>
+  </section>
+
+  <!-- ============ 5 / 15 Codex 能干什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-codex)">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">Codex</div>
+      <h2 data-anim style="--d:1">它能干什么</h2>
+    </div>
+    <div class="main">
+      <div class="abilities">
+        <div class="card ability" data-anim style="--d:2">
+          <div class="a-num">01</div>
+          <div class="a-name">读懂整个项目</div>
+          <div class="a-desc">不是只看你打开的那个文件,而是把整个仓库读一遍</div>
+        </div>
+        <div class="card ability" data-anim style="--d:3">
+          <div class="a-num">02</div>
+          <div class="a-name">自己动手改</div>
+          <div class="a-desc">直接改文件、装依赖、跑测试,不是给你建议让你抄</div>
+        </div>
+        <div class="card ability" data-anim style="--d:4">
+          <div class="a-num">03</div>
+          <div class="a-name">并行跑长任务</div>
+          <div class="a-desc">云端可以同时开好几个,你在忙别的它也继续干</div>
+        </div>
+      </div>
+      <div class="for-who" data-anim style="--d:5">
+        <span class="k">适合谁</span>
+        <span>已经在用 ChatGPT 订阅的人;要把长任务丢到云端并行跑的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:6">
+        <span class="k">注意</span>
+        <span>能换成别家的模型,但对方必须支持 Responses 接口</span>
+      </div>
+    </div>
+    <aside class="notes">
+【Codex 能力 · 20 秒】
+三件事:读懂整个项目、自己动手改、还能并行跑长任务。
+适合两种人:已经在付 ChatGPT 订阅的,和习惯在终端里干活的人。
+要提醒一句:它也能接别家的模型,但有门槛 —— 要求对方实现 Responses 接口,只兼容普通接口的不行。
+    </aside>
+  </section>
+
+  <!-- ============ 6 / 15 Claude Code 是什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-claudecode)">
+    <div class="tool-main">
+      <div class="tool-id">
+        <div class="co-logo" data-anim style="--d:0"><!--LOGO:claudecode--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg><!--/LOGO--></div>
+        <h2 class="tool-name" data-anim style="--d:1">Claude<br>Code</h2>
+        <p class="tool-by" data-anim style="--d:2">Anthropic 出品</p>
+        <p class="tool-pos" data-anim style="--d:3">终端里最出名的那个编程 agent</p>
+        <div class="tool-forms" data-anim style="--d:4">
+          <span class="pill">终端</span>
+          <span class="pill">IDE 插件</span>
+          <span class="pill">桌面 App</span>
+          <span class="pill">云端会话</span>
+        </div>
+      </div>
+      <div class="diagram-wrap" data-anim style="--d:5">
+        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
+          <rect class="win" x="16" y="40" width="330" height="320" rx="16"/>
+          <line class="sep" x1="16" y1="88" x2="346" y2="88"/>
+          <circle class="dot" cx="44" cy="64" r="6"/>
+          <circle class="dot" cx="66" cy="64" r="6"/>
+          <circle class="dot" cx="88" cy="64" r="6"/>
+          <text class="lblInk" x="40" y="134">$ claude</text>
+          <rect class="ln" x="40" y="158" width="250" height="12" rx="6"/>
+          <rect class="ln" x="40" y="186" width="276" height="12" rx="6"/>
+          <rect class="ln" x="40" y="214" width="200" height="12" rx="6"/>
+          <rect class="lnInk" x="40" y="254" width="262" height="12" rx="6"/>
+          <rect class="ln" x="40" y="282" width="160" height="12" rx="6"/>
+          <text class="lbl" x="40" y="338">改完自己跑测试</text>
+          <rect class="chip" x="420" y="40" width="324" height="62" rx="14"/>
+          <text class="lblChip" x="448" y="80">1 读懂代码库</text>
+          <rect class="chip" x="420" y="118" width="324" height="62" rx="14"/>
+          <text class="lblChip" x="448" y="158">2 跨文件改</text>
+          <rect class="chip chipOn" x="420" y="196" width="324" height="62" rx="14"/>
+          <text class="lblOn" x="448" y="236">3 跑测试验证</text>
+          <rect class="chip" x="420" y="274" width="324" height="62" rx="14"/>
+          <text class="lblChip" x="448" y="314">4 没过就再改</text>
+          <path class="arrDash" d="M400 305 C372 305 372 71 400 71"/>
+        </svg>
+      </div>
+    </div>
+    <aside class="notes">
+【Claude Code · 20 秒】
+第二个,Anthropic 的 Claude Code。
+它和 Codex 很像,也是终端里的编程 agent,但走的是另一条路线。
+右边这四步是它的工作循环:读懂代码库、跨文件改、跑测试、没过就再改。
+    </aside>
+  </section>
+
+  <!-- ============ 7 / 15 Claude Code 能干什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-claudecode)">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">Claude Code</div>
+      <h2 data-anim style="--d:1">它强在哪里</h2>
+    </div>
+    <div class="main">
+      <div class="abilities">
+        <div class="card ability" data-anim style="--d:2">
+          <div class="a-num">01</div>
+          <div class="a-name">仓库级改造</div>
+          <div class="a-desc">一次动几十个文件的活,它比聊天框可靠得多</div>
+        </div>
+        <div class="card ability" data-anim style="--d:3">
+          <div class="a-num">02</div>
+          <div class="a-name">会自己验证</div>
+          <div class="a-desc">改完自己跑测试,失败了继续改,不用你盯着</div>
+        </div>
+        <div class="card ability" data-anim style="--d:4">
+          <div class="a-num">03</div>
+          <div class="a-name">分工可指定模型</div>
+          <div class="a-desc">同一个任务里,能让不同的小 agent 用不同的模型</div>
+        </div>
+      </div>
+      <div class="for-who" data-anim style="--d:5">
+        <span class="k">适合谁</span>
+        <span>要动很多文件的改造;对代码质量要求高的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:6">
+        <span class="k">注意</span>
+        <span>要 Claude 的订阅或 API 额度,没有免费档</span>
+      </div>
+    </div>
+    <aside class="notes">
+【Claude Code 能力 · 20 秒】
+它最强的三点:仓库级的大改造、改完自己验证、还能给不同的小 agent 指定不同模型。
+适合要动很多文件、又在意代码质量的人。
+注意它要付费,没有独立免费档。
+    </aside>
+  </section>
+
+  <!-- ============ 8 / 15 Trae 是什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-trae)">
+    <div class="tool-main">
+      <div class="tool-id">
+        <div class="co-logo" data-anim style="--d:0"><!--LOGO:trae--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M24 20.5H3.5V17H0V3.5h24ZM3.5 17h17V7h-17Zm8.5-5-2.5 2.5L7 12l2.5-2.5Zm7 0-2.5 2.5L14 12l2.5-2.5z"/></svg><!--/LOGO--></div>
+        <h2 class="tool-name" data-anim style="--d:1">Trae</h2>
+        <p class="tool-by" data-anim style="--d:2">字节跳动出品</p>
+        <p class="tool-pos" data-anim style="--d:3">一个把 AI 装进编辑器的完整开发环境</p>
+        <div class="tool-forms" data-anim style="--d:4">
+          <span class="pill">桌面 IDE</span>
+          <span class="pill">中文优先</span>
+          <span class="pill">也有网页版</span>
+        </div>
+      </div>
+      <div class="diagram-wrap" data-anim style="--d:5">
+        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
+          <rect class="win" x="16" y="30" width="728" height="340" rx="16"/>
+          <line class="sep" x1="16" y1="78" x2="744" y2="78"/>
+          <circle class="dot" cx="44" cy="54" r="6"/>
+          <circle class="dot" cx="66" cy="54" r="6"/>
+          <circle class="dot" cx="88" cy="54" r="6"/>
+          <line class="sep" x1="212" y1="78" x2="212" y2="370"/>
+          <line class="sep" x1="540" y1="78" x2="540" y2="370"/>
+          <rect class="lnMid" x="40" y="108" width="120" height="12" rx="6"/>
+          <rect class="ln" x="60" y="138" width="100" height="12" rx="6"/>
+          <rect class="ln" x="60" y="166" width="132" height="12" rx="6"/>
+          <rect class="ln" x="80" y="194" width="88" height="12" rx="6"/>
+          <rect class="ln" x="60" y="222" width="112" height="12" rx="6"/>
+          <text class="lbl" x="40" y="342">文件树</text>
+          <rect class="ln" x="240" y="108" width="220" height="14" rx="7"/>
+          <rect class="ln" x="240" y="140" width="272" height="14" rx="7"/>
+          <rect class="lnBrand" x="264" y="172" width="196" height="14" rx="7"/>
+          <rect class="ln" x="240" y="204" width="244" height="14" rx="7"/>
+          <rect class="ln" x="264" y="236" width="176" height="14" rx="7"/>
+          <rect class="ln" x="240" y="268" width="212" height="14" rx="7"/>
+          <text class="lbl" x="240" y="342">代码</text>
+          <rect class="chip" x="564" y="106" width="160" height="100" rx="14"/>
+          <text class="lblChip" x="588" y="164">你说需求</text>
+          <rect class="chip chipOn" x="564" y="232" width="160" height="100" rx="14"/>
+          <text class="lblOn" x="588" y="290">它写完整项目</text>
+        </svg>
+      </div>
+    </div>
+    <aside class="notes">
+【Trae · 20 秒】
+第三个,字节跳动的 Trae。
+它不是终端工具,是一个完整的编辑器 —— 左边文件树、中间代码、右边 AI 对话。
+对中文用户特别友好,你直接用中文描述需求,它能从零搭出一个项目。
+    </aside>
+  </section>
+
+  <!-- ============ 9 / 15 Trae 能干什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-trae)">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">Trae</div>
+      <h2 data-anim style="--d:1">它适合什么场景</h2>
+    </div>
+    <div class="main">
+      <div class="abilities">
+        <div class="card ability" data-anim style="--d:2">
+          <div class="a-num">01</div>
+          <div class="a-name">从零建项目</div>
+          <div class="a-desc">一句话描述需求,它把文件、代码、页面全搭出来</div>
+        </div>
+        <div class="card ability" data-anim style="--d:3">
+          <div class="a-num">02</div>
+          <div class="a-name">三种放手程度</div>
+          <div class="a-desc">只聊天、帮你搭、完全交给它自主执行,你选</div>
+        </div>
+        <div class="card ability" data-anim style="--d:4">
+          <div class="a-num">03</div>
+          <div class="a-name">中文场景友好</div>
+          <div class="a-desc">用中文提需求、看中文注释,是国内最早上的一批</div>
+        </div>
+      </div>
+      <div class="for-who" data-anim style="--d:5">
+        <span class="k">适合谁</span>
+        <span>想在一个窗口里把项目做完的人;不习惯终端的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:6">
+        <span class="k">注意</span>
+        <span>2026 年 8 月起,团队已并入字节的豆包体系</span>
+      </div>
+    </div>
+    <aside class="notes">
+【Trae 能力 · 20 秒】
+它适合:从零建项目、想控制放手程度、以及中文场景。
+它最大的价值是给不习惯终端的人一个完整的环境。
+补一个信息:2026 年 8 月,Trae 团队已经并入字节的豆包体系。
+    </aside>
+  </section>
+
+  <!-- ============ 10 / 15 WorkBuddy 是什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-workbuddy)">
+    <div class="tool-main">
+      <div class="tool-id">
+        <div class="co-logo" data-anim style="--d:0"><!--LOGO:workbuddy--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><g fill="#FFFFFF"><path d="M28.5931 3.12762C28.9853 2.77585 29.0091 2.76226 29.2968 2.74499C29.7628 2.71096 30.1894 2.93488 30.916 3.59634C32.6132 5.13875 34.9769 8.30904 36.4462 11.0168L37.0138 12.0682L37.8156 12.4668C38.5896 12.8579 39.8593 13.6593 40.3898 14.0895C40.6297 14.2878 40.6638 14.2925 40.9133 14.1954C42.0388 13.7572 43.6506 14.3382 45.0727 15.7024C46.3529 16.9294 47.5794 19.026 48.0491 20.7757C48.1177 21.0574 48.2087 21.6628 48.2419 22.1134C48.349 23.6964 47.8414 24.9608 46.8637 25.5331C46.664 25.6484 46.6505 25.6795 46.6561 26.1774C46.7011 28.5481 46.0621 30.9144 44.7785 33.2221C43.3293 35.8133 40.7489 38.4945 37.2566 41.0199C35.3813 42.3846 30.9445 44.9701 28.9382 45.8778C24.1324 48.0414 20.2794 48.8709 16.9329 48.4609C14.9368 48.219 12.6769 47.44 11.34 46.5355C10.9885 46.2925 10.9325 46.2774 10.6637 46.3543C9.2327 46.7651 7.35867 45.9207 5.76659 44.1535C5.13165 43.4471 4.1065 41.7127 3.77404 40.7843C3.0054 38.6118 3.15852 36.6506 4.18236 35.4799C4.44671 35.1785 4.45511 35.1658 4.39735 34.6589C4.30195 33.8289 4.25837 32.6008 4.30192 31.808L4.33666 31.0674L3.22502 29.101C1.5033 26.0375 0.409325 23.4645 -0.012563 21.4992C-0.235219 20.4218 -0.221193 19.9436 0.0522186 19.5899C0.21871 19.3763 0.764928 19.1545 1.42322 19.0329C3.08041 18.742 6.69466 19.0056 10.7155 19.7155L11.1329 19.788L12.0511 18.976C13.5747 17.6264 14.587 16.8696 16.4531 15.706C18.3981 14.4891 20.5929 13.4877 23.0648 12.695L23.8577 12.4414L24.2939 11.2964C25.8547 7.17615 27.4533 4.13844 28.5931 3.12762ZM15.5182 24.243C13.7542 25.2615 12.8718 25.7706 12.2236 26.3413C9.59893 28.6526 8.61811 32.3134 9.73545 35.6274C10.0114 36.4457 10.5201 37.3283 11.5386 39.0923C12.5571 40.8564 13.0671 41.7383 13.6378 42.3864C15.9491 45.0112 19.6103 45.9929 22.9243 44.8755C23.7426 44.5995 24.6249 44.0899 26.3888 43.0714L36.5375 37.2121C38.3016 36.1936 39.184 35.6845 39.8321 35.1137C42.4568 32.8024 43.4373 29.1409 42.3198 25.8269C42.0438 25.0086 41.5342 24.1264 40.5158 22.3624C39.4973 20.5983 38.9882 19.7159 38.4175 19.0678C36.1062 16.4432 32.4454 15.4622 29.1314 16.5796C28.3131 16.8556 27.431 17.3651 25.6669 18.3836L15.5182 24.243Z"/><rect x="16.4961" y="31.3344" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 16.4961 31.3344)" fill="white" style="fill:white;fill-opacity:1;"/><rect x="27.3125" y="25.0894" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 27.3125 25.0894)" fill="white" style="fill:white;fill-opacity:1;"/></g></svg><!--/LOGO--></div>
+        <h2 class="tool-name" data-anim style="--d:1">WorkBuddy</h2>
+        <p class="tool-by" data-anim style="--d:2">腾讯云 CodeBuddy 团队出品</p>
+        <p class="tool-pos" data-anim style="--d:3">不是编程工具,是给所有职场人的桌面 Agent</p>
+        <div class="tool-forms" data-anim style="--d:4">
+          <span class="pill">桌面工作台</span>
+          <span class="pill">能读本地文件</span>
+          <span class="pill">微信遥控</span>
+        </div>
+      </div>
+      <div class="diagram-wrap" data-anim style="--d:5">
+        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
+          <rect class="win" x="16" y="30" width="500" height="340" rx="16"/>
+          <line class="sep" x1="16" y1="78" x2="516" y2="78"/>
+          <circle class="dot" cx="44" cy="54" r="6"/>
+          <circle class="dot" cx="66" cy="54" r="6"/>
+          <circle class="dot" cx="88" cy="54" r="6"/>
+          <text class="lbl" x="40" y="112">它自己去翻你电脑里的文件</text>
+          <rect class="chip" x="40" y="128" width="452" height="66" rx="12"/>
+          <rect class="lnBrand" x="60" y="150" width="20" height="20" rx="6"/>
+          <rect class="ln" x="94" y="152" width="240" height="10" rx="5"/>
+          <rect class="ln" x="94" y="172" width="160" height="10" rx="5"/>
+          <rect class="chip" x="40" y="206" width="452" height="66" rx="12"/>
+          <rect class="lnBrand" x="60" y="228" width="20" height="20" rx="6"/>
+          <rect class="ln" x="94" y="230" width="286" height="10" rx="5"/>
+          <rect class="ln" x="94" y="250" width="130" height="10" rx="5"/>
+          <rect class="chip" x="40" y="284" width="452" height="66" rx="12"/>
+          <rect class="ln" x="60" y="306" width="20" height="20" rx="6"/>
+          <rect class="ln" x="94" y="308" width="212" height="10" rx="5"/>
+          <rect class="ln" x="94" y="328" width="176" height="10" rx="5"/>
+          <rect class="win" x="556" y="60" width="188" height="310" rx="26"/>
+          <rect class="chip chipOn" x="580" y="112" width="140" height="80" rx="12"/>
+          <text class="lblOn" x="598" y="160">微信发一句</text>
+          <rect class="chip" x="580" y="212" width="140" height="80" rx="12"/>
+          <text class="lblChip" x="598" y="260">电脑自己干</text>
+          <text class="lbl" x="580" y="340">人在外面也行</text>
+        </svg>
+      </div>
+    </div>
+    <aside class="notes">
+【WorkBuddy · 25 秒】
+第四个要特别说明:WorkBuddy 不是编程工具,是腾讯的办公 Agent。
+它最不一样的地方是能读你电脑里的本地文件,自己去整理、分析、做成东西。
+右边这个手机是说:你在外面用微信发一句,家里电脑自己开工。
+所以它面向的是不写代码的普通职场人。
+    </aside>
+  </section>
+
+  <!-- ============ 11 / 15 WorkBuddy 能干什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-workbuddy)">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">WorkBuddy</div>
+      <h2 data-anim style="--d:1">它和聊天框差在哪</h2>
+    </div>
+    <div class="main">
+      <div class="abilities">
+        <div class="card ability" data-anim style="--d:2">
+          <div class="a-num">01</div>
+          <div class="a-name">多个 Agent 并行</div>
+          <div class="a-desc">最多 8 个同时干不同的活,不是排队一个一个来</div>
+        </div>
+        <div class="card ability" data-anim style="--d:3">
+          <div class="a-num">02</div>
+          <div class="a-name">能在本地动手</div>
+          <div class="a-desc">直接读你硬盘上的文件、整理归类、提取数据做汇报</div>
+        </div>
+        <div class="card ability" data-anim style="--d:4">
+          <div class="a-num">03</div>
+          <div class="a-name">三档放手程度</div>
+          <div class="a-desc">只聊、直接干、先给计划再干,按任务复杂度选</div>
+        </div>
+      </div>
+      <div class="for-who" data-anim style="--d:5">
+        <span class="k">适合谁</span>
+        <span>不写代码的职场人;要整理一堆文档和数据的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:6">
+        <span class="k">注意</span>
+        <span>腾讯还有 CodeBuddy 和 QClaw,三个名字别混</span>
+      </div>
+    </div>
+    <aside class="notes">
+【WorkBuddy 能力 · 20 秒】
+三点:多 agent 并行、能在本地动手、三档放手程度。
+适合不写代码的职场人,尤其是要整理一堆文档和数据的。
+提醒:腾讯还有 CodeBuddy 和 QClaw,名字很像,但分工完全不同,别混。
+    </aside>
+  </section>
+
+  <!-- ============ 12 / 15 DeepSeek Harness 是什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-dsh)">
+    <div class="tool-main">
+      <div class="tool-id">
+        <div class="co-logo" data-anim style="--d:0"><!--LOGO:deepseek--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg><!--/LOGO--></div>
+        <h2 class="tool-name" data-anim style="--d:1">DeepSeek<br>Harness</h2>
+        <p class="tool-by" data-anim style="--d:2">DeepSeek 出品 · 开源</p>
+        <p class="tool-pos" data-anim style="--d:3">一个开源的 agent 运行环境,什么都做成插件</p>
+        <div class="tool-forms" data-anim style="--d:4">
+          <span class="pill">桌面 App</span>
+          <span class="pill">网页界面</span>
+          <span class="pill">开放源代码</span>
+        </div>
+      </div>
+      <div class="diagram-wrap" data-anim style="--d:5">
+        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
+          <rect class="win" x="16" y="30" width="728" height="340" rx="16"/>
+          <line class="sep" x1="16" y1="78" x2="744" y2="78"/>
+          <circle class="dot" cx="44" cy="54" r="6"/>
+          <circle class="dot" cx="66" cy="54" r="6"/>
+          <circle class="dot" cx="88" cy="54" r="6"/>
+          <line class="sep" x1="196" y1="78" x2="196" y2="370"/>
+          <rect class="lnMid" x="40" y="108" width="128" height="12" rx="6"/>
+          <rect class="ln" x="40" y="138" width="112" height="12" rx="6"/>
+          <rect class="ln" x="40" y="168" width="136" height="12" rx="6"/>
+          <rect class="ln" x="40" y="198" width="96" height="12" rx="6"/>
+          <rect class="ln" x="40" y="228" width="124" height="12" rx="6"/>
+          <text class="lbl" x="40" y="342">插件</text>
+          <rect class="chip chipOn" x="228" y="106" width="152" height="104" rx="14"/>
+          <text class="lblOn" x="256" y="166">定时任务</text>
+          <rect class="chip chipOn" x="404" y="106" width="152" height="104" rx="14"/>
+          <text class="lblOn" x="432" y="166">多 Agent</text>
+          <rect class="chip chipOn" x="580" y="106" width="148" height="104" rx="14"/>
+          <text class="lblOn" x="608" y="166">语音输入</text>
+          <rect class="chip" x="228" y="230" width="152" height="104" rx="14"/>
+          <text class="lblChip" x="256" y="290">聊天造插件</text>
+          <rect class="chip" x="404" y="230" width="152" height="104" rx="14"/>
+          <text class="lblChip" x="432" y="290">社区插件</text>
+          <rect class="chip" x="580" y="230" width="148" height="104" rx="14"/>
+          <text class="lblChip" x="608" y="290">随便改</text>
+        </svg>
+      </div>
+    </div>
+    <aside class="notes">
+【DeepSeek Harness · 25 秒】
+最后一个,DeepSeek 的 Harness。
+它的思路和前四个都不一样:它把一切都做成插件,而且开源。
+也就是说,能力不够就装一个插件;找不到合适的,直接跟它聊天让它给你造一个。
+注意它和 DeepSeek 的模型是两回事 —— 模型是模型,这个是运行环境。
+    </aside>
+  </section>
+
+  <!-- ============ 13 / 15 DeepSeek Harness 能干什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-dsh)">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">DeepSeek Harness</div>
+      <h2 data-anim style="--d:1">它为什么值得单独讲</h2>
+    </div>
+    <div class="main">
+      <div class="abilities">
+        <div class="card ability" data-anim style="--d:2">
+          <div class="a-num">01</div>
+          <div class="a-name">开源,能自己改</div>
+          <div class="a-desc">代码公开,不满意可以自己动手,不用等厂商更新</div>
+        </div>
+        <div class="card ability" data-anim style="--d:3">
+          <div class="a-num">02</div>
+          <div class="a-name">能力靠插件长出来</div>
+          <div class="a-desc">定时任务、多 Agent、语音输入,都是装上去的插件</div>
+        </div>
+        <div class="card ability" data-anim style="--d:4">
+          <div class="a-num">03</div>
+          <div class="a-name">聊天就能造插件</div>
+          <div class="a-desc">不会写代码也行,说一句让它给你做一个</div>
+        </div>
+      </div>
+      <div class="for-who" data-anim style="--d:5">
+        <span class="k">适合谁</span>
+        <span>喜欢自己折腾的人;不想被某一家厂商锁死的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:6">
+        <span class="k">注意</span>
+        <span>目前还是公开预览版,不是正式版</span>
+      </div>
+    </div>
+    <aside class="notes">
+【Harness 能力 · 20 秒】
+三个理由:开源能自己改、能力靠插件长出来、还能直接用聊天造插件。
+适合喜欢折腾、或者不想被一家厂商锁死的人。
+提醒一句:它现在还是公开预览阶段,不是正式版。
+    </aside>
+  </section>
+
+  <!-- ============ 14 / 15 对照表 ============ -->
+  <section class="slide tight">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">一张图带走</div>
+      <h2 data-anim style="--d:1">五个工具,一句话记住</h2>
+    </div>
+    <div class="main">
+      <div class="compare">
+        <div class="crow" data-anim style="--d:2; --brand:var(--brand-tool-codex)">
+          <span class="c-logo"><!--LOGO:codex--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></span>
+          <span class="c-name">Codex</span>
+          <span class="c-form">终端 / 云端 · OpenAI</span>
+          <span class="c-one">OpenAI 自己的编程 agent</span>
+        </div>
+        <div class="crow" data-anim style="--d:3; --brand:var(--brand-tool-claudecode)">
+          <span class="c-logo"><!--LOGO:claudecode--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg><!--/LOGO--></span>
+          <span class="c-name">Claude Code</span>
+          <span class="c-form">终端为主 · Anthropic</span>
+          <span class="c-one">动大工程最稳的那个</span>
+        </div>
+        <div class="crow" data-anim style="--d:4; --brand:var(--brand-tool-trae)">
+          <span class="c-logo"><!--LOGO:trae--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M24 20.5H3.5V17H0V3.5h24ZM3.5 17h17V7h-17Zm8.5-5-2.5 2.5L7 12l2.5-2.5Zm7 0-2.5 2.5L14 12l2.5-2.5z"/></svg><!--/LOGO--></span>
+          <span class="c-name">Trae</span>
+          <span class="c-form">桌面 IDE · 字节跳动</span>
+          <span class="c-one">给不习惯终端的人</span>
+        </div>
+        <div class="crow" data-anim style="--d:5; --brand:var(--brand-tool-workbuddy)">
+          <span class="c-logo"><!--LOGO:workbuddy--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><g fill="#FFFFFF"><path d="M28.5931 3.12762C28.9853 2.77585 29.0091 2.76226 29.2968 2.74499C29.7628 2.71096 30.1894 2.93488 30.916 3.59634C32.6132 5.13875 34.9769 8.30904 36.4462 11.0168L37.0138 12.0682L37.8156 12.4668C38.5896 12.8579 39.8593 13.6593 40.3898 14.0895C40.6297 14.2878 40.6638 14.2925 40.9133 14.1954C42.0388 13.7572 43.6506 14.3382 45.0727 15.7024C46.3529 16.9294 47.5794 19.026 48.0491 20.7757C48.1177 21.0574 48.2087 21.6628 48.2419 22.1134C48.349 23.6964 47.8414 24.9608 46.8637 25.5331C46.664 25.6484 46.6505 25.6795 46.6561 26.1774C46.7011 28.5481 46.0621 30.9144 44.7785 33.2221C43.3293 35.8133 40.7489 38.4945 37.2566 41.0199C35.3813 42.3846 30.9445 44.9701 28.9382 45.8778C24.1324 48.0414 20.2794 48.8709 16.9329 48.4609C14.9368 48.219 12.6769 47.44 11.34 46.5355C10.9885 46.2925 10.9325 46.2774 10.6637 46.3543C9.2327 46.7651 7.35867 45.9207 5.76659 44.1535C5.13165 43.4471 4.1065 41.7127 3.77404 40.7843C3.0054 38.6118 3.15852 36.6506 4.18236 35.4799C4.44671 35.1785 4.45511 35.1658 4.39735 34.6589C4.30195 33.8289 4.25837 32.6008 4.30192 31.808L4.33666 31.0674L3.22502 29.101C1.5033 26.0375 0.409325 23.4645 -0.012563 21.4992C-0.235219 20.4218 -0.221193 19.9436 0.0522186 19.5899C0.21871 19.3763 0.764928 19.1545 1.42322 19.0329C3.08041 18.742 6.69466 19.0056 10.7155 19.7155L11.1329 19.788L12.0511 18.976C13.5747 17.6264 14.587 16.8696 16.4531 15.706C18.3981 14.4891 20.5929 13.4877 23.0648 12.695L23.8577 12.4414L24.2939 11.2964C25.8547 7.17615 27.4533 4.13844 28.5931 3.12762ZM15.5182 24.243C13.7542 25.2615 12.8718 25.7706 12.2236 26.3413C9.59893 28.6526 8.61811 32.3134 9.73545 35.6274C10.0114 36.4457 10.5201 37.3283 11.5386 39.0923C12.5571 40.8564 13.0671 41.7383 13.6378 42.3864C15.9491 45.0112 19.6103 45.9929 22.9243 44.8755C23.7426 44.5995 24.6249 44.0899 26.3888 43.0714L36.5375 37.2121C38.3016 36.1936 39.184 35.6845 39.8321 35.1137C42.4568 32.8024 43.4373 29.1409 42.3198 25.8269C42.0438 25.0086 41.5342 24.1264 40.5158 22.3624C39.4973 20.5983 38.9882 19.7159 38.4175 19.0678C36.1062 16.4432 32.4454 15.4622 29.1314 16.5796C28.3131 16.8556 27.431 17.3651 25.6669 18.3836L15.5182 24.243Z"/><rect x="16.4961" y="31.3344" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 16.4961 31.3344)" fill="white" style="fill:white;fill-opacity:1;"/><rect x="27.3125" y="25.0894" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 27.3125 25.0894)" fill="white" style="fill:white;fill-opacity:1;"/></g></svg><!--/LOGO--></span>
+          <span class="c-name">WorkBuddy</span>
+          <span class="c-form">桌面工作台 · 腾讯</span>
+          <span class="c-one">不写代码也能用的 Agent</span>
+        </div>
+        <div class="crow" data-anim style="--d:6; --brand:var(--brand-tool-dsh)">
+          <span class="c-logo"><!--LOGO:deepseek--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg><!--/LOGO--></span>
+          <span class="c-name">DSH</span>
+          <span class="c-form">桌面 + 网页 · 开源</span>
+          <span class="c-one">能力全靠插件,能自己改</span>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+【对照表 · 25 秒】
+这一页建议暂停截图。
+口播只念每行最后一句:OpenAI 的编程 agent、动大工程最稳、给不习惯终端的人、
+不写代码也能用、能力全靠插件。DSH 是 DeepSeek Harness 的简称,画面上写全名太长。
+    </aside>
+  </section>
+
+  <!-- ============ 15 / 15 收尾 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">今天就记一句话</div>
+      <h2 data-anim style="--d:1">会答问题的 AI 和会干活的 AI,是两个物种</h2>
+    </div>
+    <div class="main">
+      <div class="cards">
+        <div class="card" data-anim style="--d:2">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+            <span class="tag">先看形态</span>
+          </div>
+          <div class="c-main">终端?</div>
+          <div class="c-sub">是给习惯终端的人,门槛高但最灵活</div>
+        </div>
+        <div class="card" data-anim style="--d:3">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+            <span class="tag">再看形态</span>
+          </div>
+          <div class="c-main">带界面?</div>
+          <div class="c-sub">编辑器或桌面工作台,给普通人的入口</div>
+        </div>
+        <div class="card is-hit" data-anim style="--d:4">
+          <div class="c-top">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
+            <span class="tag">最后一问</span>
+          </div>
+          <div class="c-main">能用吗?</div>
+          <div class="c-sub">写代码的选前三个,不写代码的选 WorkBuddy</div>
+        </div>
+      </div>
+      <div class="next-up" data-anim style="--d:5">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+        <span>下一集:有个活要干,该挑哪个模型?</span>
+      </div>
+    </div>
+    <aside class="notes">
+【收尾 · 20 秒】
+不用记名字,记一句话就行:会答问题的 AI 和会干活的 AI,是两个物种。
+判断方法就两步:先看形态——终端还是带界面;再问自己会不会写代码。
+写代码的看前三个,不写代码的直接看 WorkBuddy。
+下一集讲:有个活要干,该挑哪个模型。
+    </aside>
+  </section>
+
+</div>
+
+<div id="notes"><div class="hint">口播备注(N 键开关,录制时请关闭)</div><div class="body"></div></div>
+<div id="help">→ / 空格 / 滚轮　　下一页<br>←　　上一页<br>F　全屏<br>N　口播备注<br>鼠标:左 15% 上一页,其余下一页</div>
+
+<script id="deck-js">
+/* ==========================================================================
+   deck.js — 放映器 v1.1(契约第 8 条)
+   无依赖、离线可用(file:// 直接双击打开也没问题)
+   键盘:← → 空格 Home End F N ?   /   滚轮上下 / 鼠标左右半边点击
+   v1.1 修复:history.replaceState 在 file:// 下会抛异常,已加 try/catch
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var STAGE_W = 1920;
+  var STAGE_H = 1080;
+
+  var stage    = document.getElementById('stage');
+  var slides   = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var progress = document.getElementById('progress');
+  var pageno   = document.getElementById('pageno');
+  var notesBox = document.getElementById('notes');
+  var notesBody= notesBox ? notesBox.querySelector('.body') : null;
+  var help     = document.getElementById('help');
+
+  if (!stage || !slides.length) return;
+
+  var index = 0;
+
+  /* ---------- 舞台缩放:内容永不回流 ---------- */
+  function fit() {
+    var s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+    stage.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---------- 翻页节流:防止一次滚动/点击连翻多页 ---------- */
+  var LOCK_MS = 300;
+  var lockedAt = 0;
+  function lock()  { lockedAt = Date.now(); }
+  function locked(){ return (Date.now() - lockedAt) < LOCK_MS; }
+
+  function pad2(n) { return n < 10 ? '0' + n : String(n); }
+
+  /* ---------- 渲染 ---------- */
+  function render() {
+    slides.forEach(function (el, i) {
+      el.classList.toggle('is-active', i === index);
+      if (i === index) {
+        // 重放进场动效
+        Array.prototype.forEach.call(el.querySelectorAll('[data-anim]'), function (n) {
+          n.style.animation = 'none';
+          void n.offsetHeight;          // 强制重排,让动画重新开始
+          n.style.animation = '';
+        });
+      }
+    });
+
+    if (pageno)   pageno.textContent = pad2(index + 1) + ' / ' + pad2(slides.length);
+    if (progress) progress.style.width = ((index + 1) / slides.length * 100) + '%';
+
+    if (notesBody) {
+      var aside = slides[index].querySelector('.notes');
+      notesBody.textContent = aside ? aside.textContent.trim() : '(本页无备注)';
+    }
+
+    // file:// 下 Chrome 会禁止 replaceState,必须吞掉这个异常
+    try {
+      if (location.hash !== '#' + (index + 1)) {
+        history.replaceState(null, '', '#' + (index + 1));
+      }
+    } catch (e) { /* file:// 下正常,忽略 */ }
+  }
+
+  function go(next) {
+    if (next < 0 || next >= slides.length || next === index) return;
+    index = next;
+    render();
+  }
+
+  /* ---------- 键盘 ---------- */
+  document.addEventListener('keydown', function (e) {
+    switch (e.key) {
+      case 'ArrowRight': case ' ': case 'PageDown': case 'Enter':
+        e.preventDefault(); go(index + 1); break;
+      case 'ArrowLeft': case 'PageUp': case 'Backspace':
+        e.preventDefault(); go(index - 1); break;
+      case 'Home': e.preventDefault(); go(0); break;
+      case 'End':  e.preventDefault(); go(slides.length - 1); break;
+      case 'f': case 'F':
+        e.preventDefault();
+        if (document.fullscreenElement) { document.exitFullscreen(); }
+        else if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen();
+        }
+        break;
+      case 'n': case 'N':
+        e.preventDefault();
+        if (notesBox) notesBox.classList.toggle('is-open');
+        break;
+      case '?': case 'h': case 'H':
+        e.preventDefault();
+        if (help) help.classList.toggle('is-open');
+        break;
+    }
+  });
+
+  /* ---------- 滚轮翻页(累加 + 节流,兼容滚轮与触控板)---------- */
+  var acc = 0, accTimer = null;
+
+  function inPanel(node) {
+    if (!node || !node.closest) return false;
+    return !!node.closest('#notes, #help');
+  }
+
+  window.addEventListener('wheel', function (e) {
+    if (inPanel(e.target)) return;
+
+    acc += e.deltaY;
+    if (accTimer) clearTimeout(accTimer);
+    accTimer = setTimeout(function () { acc = 0; }, 200);
+
+    if (locked()) return;
+    if (Math.abs(acc) < 48) return;
+
+    var dir = acc > 0 ? 1 : -1;
+    acc = 0;
+    lock();
+    go(index + dir);
+  }, { passive: true });
+
+  /* ---------- 鼠标翻页:左 15% 上一页,其余下一页 ---------- */
+  document.addEventListener('click', function (e) {
+    if (inPanel(e.target)) return;
+    if (locked()) return;
+    lock();
+    var ratio = e.clientX / window.innerWidth;
+    go(index + (ratio < 0.15 ? -1 : 1));
+  });
+
+  /* ---------- 初始页:支持 lesson-01.html#7 直接跳页 ---------- */
+  var h = parseInt((location.hash || '').replace('#', ''), 10);
+  if (!isNaN(h) && h >= 1 && h <= slides.length) index = h - 1;
+
+  render();
+})();
+</script>
+</body>
+</html>
