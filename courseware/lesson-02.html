@@ -118,6 +118,14 @@ html, body{
 }
 .slide.is-active{ display: flex; }
 
+/* ⚠️ 口播备注必须在画面上彻底消失。
+   v2.0 漏了这条规则 —— <aside class="notes"> 是 .slide 的 flex 子元素,
+   默认 display:block,于是每一页的备注文字都**被渲染在幻灯片底部**
+   (深色 16px,贴着 .main 下面),既占掉 40px 版面,也会被录进画面。
+   放映器只是把它的文本读进 #notes 面板,并不依赖它在页面上可见。
+   见 contract.md v2.2「已知踩过的坑」。 */
+.notes{ display: none; }
+
 /* ---------- 固定顶栏(chrome,所有页共用)---------- */
 .chrome{
   position: absolute;
@@ -638,12 +646,14 @@ html, body{
   color: var(--muted);
 }
 .for-who{
-  margin-top: 52px;
+  margin-top: 26px;
   display: flex;
   align-items: baseline;
   gap: 24px;
   font-size: var(--fs-body);
   line-height: 1.4;
+  /* 收窄到 1560 —— 右侧 1670 以外是抖音按钮死区,整块不许越线 */
+  max-width: 1560px;
 }
 .for-who .k{
   font-size: var(--fs-label);
@@ -659,7 +669,7 @@ html, body{
   grid-template-columns: 84px 250px 260px 1fr;
   align-items: center;
   gap: 26px;
-  padding: 18px 0;
+  padding: 16px 0;
   border-top: 2px solid var(--line-2);
 }
 .crow:first-child{ border-top: 4px solid var(--ink); }
@@ -814,20 +824,337 @@ html, body{
   display: flex; align-items: center; justify-content: center;
 }
 .pick .p-logo svg{ width: 32px; height: 32px; fill: #FFFFFF; }
+/* ⚠️ 坑:型号名与厂商名在 HTML 里是两个 <span>(.p-model / .p-why),
+   span 默认是 inline,两者会挤在同一行、中间连空格都没有 ——
+   录像里读出来是「GPT-6 AstraOpenAI · 通用能力最强的一档」。
+   型号名必须独占一行(契约 4.4 的版式图就是两行)。 */
 .pick .p-model{
+  display: block;
   font-family: var(--font-mono);
   font-size: 40px;
   line-height: 1.15;
   letter-spacing: -0.01em;
 }
+/* .p-model / .p-why 都必须是 block:inline 时两者挤在同一行,
+   而且 inline 元素上的 margin-top 根本不生效 —— 间距等于没写。 */
 .pick .p-why{
-  margin-top: 6px;
+  display: block;
+  margin-top: 10px;
   font-size: var(--fs-label);
   color: var(--muted);
 }
 
 /* 两栏卡片组 */
 .cards.cols2{ grid-template-columns: repeat(2, 1fr); }
+/* ==========================================================================
+   第二讲 v3:五种「形态母版」
+   --------------------------------------------------------------------------
+   为什么要重做(记录在案):
+     v2 里五个工具 × 两页共用同一套骨架 —— 左身份栏 + 右白卡示意图,
+     示意图又都由「窗口矩形 + 圆角胶囊」拼成。结果是十个页面肉眼分不出,
+     观众记不住「这五个工具到底差在哪」。
+     v3 的做法:骨架跟着工具的真实形态走,五个工具五套图,另加两页
+     (为什么是现在 / 怎么选)。
+     ⚠️ 本节的品牌色用法放宽了契约第 6 条 —— 见 contract.md v2.2。
+   ========================================================================== */
+
+/* ---------- 通用:形态标签(品牌色实底胶囊)---------- */
+.formtag{
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  align-self: flex-start;
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: var(--brand, var(--ink));
+  color: #FFFFFF;
+  font-size: var(--fs-label);
+  letter-spacing: .14em;
+  white-space: nowrap;
+}
+.formtag .ft-dot{
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.9);
+  flex: none;
+}
+
+/* ---------- 通用:命中什么 ---------- */
+.hit{
+  margin-top: 30px;
+  padding-left: 24px;
+  border-left: 8px solid var(--brand, var(--ink));
+}
+.hit .k{
+  display: block;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.hit .v{
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+/* ---------- 通用:数据带(一个可核实的数字)---------- */
+.statband{
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  padding: 28px 36px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  border-left: 10px solid var(--brand, var(--ink));
+}
+.statband .s-num{
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 54px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--brand, var(--ink));
+  white-space: nowrap;
+}
+.statband .s-cap{
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   骨架 A / C / E:上身份横条 + 下整宽图
+   用在 Codex(汇聚)、Trae(三栏 IDE)、DeepSeek Harness(拼装台)
+   ========================================================================== */
+.arch-stack{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 42px;
+  min-height: 0;
+  /* 重心略上提:让示意图白卡底边停在 930 以内,
+     不要把卡片角落压到抖音右侧按钮的死区里 */
+  padding-bottom: 84px;
+}
+.tid-bar{
+  display: flex;
+  align-items: center;
+  gap: 38px;
+}
+.tid-bar .co-logo{ margin-bottom: 0; flex: none; }
+.tid-bar .tid-txt{ min-width: 0; }
+.tid-bar .tool-name{ font-size: 72px; line-height: 1; letter-spacing: -0.03em; }
+.tid-bar .tool-by{ margin-top: 12px; font-size: var(--fs-label); color: var(--muted); }
+.tid-bar .tid-pos{
+  margin-top: 12px;
+  font-size: var(--fs-body);
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+.tid-bar .tid-tail{
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 18px;
+}
+.arch-stack .diagram-wrap{ padding: 26px 34px 22px; }
+
+/* ==========================================================================
+   骨架 B / D:左身份竖栏 + 右专属图
+   用在 Claude Code(闭环)、WorkBuddy(两端)
+   ========================================================================== */
+.arch-side{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 560px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+.arch-side .tool-name{ font-size: 84px; line-height: 1.06; letter-spacing: -0.03em; }
+.arch-side .tool-by{ margin-top: 22px; font-size: var(--fs-label); color: var(--muted); }
+.arch-side .tid-pos{
+  margin-top: 20px;
+  font-size: var(--fs-body);
+  line-height: 1.36;
+  color: var(--ink-2);
+}
+.arch-side .formtag{ margin-top: 28px; }
+
+/* ==========================================================================
+   第二页母版:特点卡 + 数据带 + 适合谁 / 注意
+   (五页共用,这是「重复带来流畅」的那一半)
+   ========================================================================== */
+.feats{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  margin-bottom: 32px;
+}
+.feat{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--brand, var(--ink));
+  padding: 32px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.feat .f-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--brand, var(--muted));
+}
+.feat .f-name{
+  font-size: 50px;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+}
+.feat .f-desc{
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.feats.cols2{ grid-template-columns: repeat(2, 1fr); }
+
+/* ==========================================================================
+   时间线(「为什么是现在」页)
+   ========================================================================== */
+.tl{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.tl .tl-item{
+  padding: 6px 34px 6px 34px;
+  border-left: 2px solid var(--line);
+}
+.tl .tl-item:first-child{ border-left: none; padding-left: 0; }
+.tl .tl-item:last-child{ padding-right: 0; }
+.tl .tl-when{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  letter-spacing: .06em;
+}
+.tl .tl-what{
+  margin-top: 20px;
+  font-size: 46px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.tl .tl-desc{
+  margin-top: 18px;
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.takeaway{
+  margin-top: 36px;
+  display: flex;
+  align-items: stretch;
+  gap: 26px;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.takeaway .bar{
+  flex: none;
+  width: 10px;
+  border-radius: 5px;
+  background: var(--ink);
+}
+
+/* ==========================================================================
+   决策页(「怎么选」)
+   ========================================================================== */
+.split-note{
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 22px 32px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--ink);
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.split-note .k{
+  flex: none;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+.fork{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  margin-top: 40px;
+}
+.fcol .fq{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 50px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  padding-bottom: 22px;
+  border-bottom: 4px solid var(--ink);
+}
+.fcol .fq .dot{
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--brand, var(--ink));
+  flex: none;
+}
+.fbranch{ margin-top: 26px; display: flex; flex-direction: column; gap: 20px; }
+.fb{
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  align-items: baseline;
+  gap: 22px;
+  padding: 20px 26px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  border-left: 8px solid var(--brand, var(--ink));
+}
+.fb .fb-when{ font-size: var(--fs-meta); color: var(--muted); }
+.fb .fb-what{ font-size: 40px; line-height: 1.2; letter-spacing: -0.02em; }
+
+/* ==========================================================================
+   对照表(第二讲版:图标 / 名字 / 形态 / 门槛 / 一句话)
+   ========================================================================== */
+.crow.crow5{ grid-template-columns: 76px 232px 268px 250px 1fr; gap: 24px; }
+.crow .c-gate{ font-size: var(--fs-label); color: var(--muted); }
+
+/* ==========================================================================
+   示意图新增图元
+   ========================================================================== */
+.diagram .soft{ fill: #F2F2EE; }
+.diagram .softBrand{ fill: var(--brand); fill-opacity: .12; }
+.diagram .node{ fill: var(--brand); }
+.diagram .nodeInk{ fill: var(--ink); }
+.diagram .conn{ stroke: var(--line); stroke-width: 3; fill: none; }
+.diagram .connBrand{ stroke: var(--brand); stroke-width: 3; fill: none; }
+.diagram .ring{ fill: none; stroke: var(--line); stroke-width: 3; }
+.diagram .ringBrand{ fill: none; stroke: var(--brand); stroke-width: 4;
+                     stroke-dasharray: 12 10; stroke-linecap: round; }
+.diagram .tOn{ font-family: var(--font-cn); font-size: 26px; fill: #FFFFFF; text-anchor: middle; }
+.diagram .tOnMono{ font-family: var(--font-mono); font-size: 26px; fill: #FFFFFF; text-anchor: middle; }
+.diagram .tMid{ font-family: var(--font-cn); font-size: 26px; fill: var(--ink); text-anchor: middle; }
+.diagram .tMidBig{ font-family: var(--font-cn); font-size: 32px; fill: var(--ink); text-anchor: middle; }
+.diagram .tSml{ font-family: var(--font-cn); font-size: 24px; fill: var(--muted); text-anchor: middle; }
+.diagram .tL{ font-family: var(--font-cn); font-size: 26px; fill: var(--ink); }
+.diagram .tLm{ font-family: var(--font-mono); font-size: 24px; fill: var(--muted); }
+
 </style>
 </head>
 <body>
@@ -840,29 +1167,29 @@ html, body{
     <span class="chrome-lesson">会自己动手的 AI</span>
     <span class="chrome-right">
       <span class="chrome-date">信息截至 2026-10</span>
-      <span class="chrome-step" id="pageno">01 / 15</span>
+      <span class="chrome-step" id="pageno">01 / 17</span>
     </span>
   </div>
 
-  <!-- ============ 1 / 15 封面 ============ -->
+  <!-- ============ 1 / 17 封面 ============ -->
   <section class="slide cover is-active">
     <div class="main">
       <div class="eyebrow" data-anim style="--d:0">5 分钟搞懂</div>
-      <h1 data-anim style="--d:1">会自己动手的 AI,<br>到底长什么样?</h1>
-      <p class="sub" data-anim style="--d:2">Codex · Claude Code · Trae · WorkBuddy · DeepSeek Harness</p>
+      <h1 data-anim style="--d:1">5 个会动手的 AI,<br>选对一个替你干活</h1>
+      <p class="sub" data-anim style="--d:2">五个工具各占两页,最后那张对照表 —— 截图就能用</p>
       <div class="stamp" data-anim style="--d:3">
         <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5"/></svg>
-        <span>它们和聊天框不是一回事</span>
+        <span>Codex · Claude Code · Trae · WorkBuddy · DeepSeek Harness</span>
       </div>
     </div>
     <aside class="notes">
 【封面 · 5 秒】
-上一集讲的是公司和模型。这一集讲模型被做成了什么工具。
-不念标题,直接进内容。
+第一句先给结论:大部分人用 AI 还停在聊天框里复制粘贴 —— 今天这五个工具,会自己读文件、改文件、跑命令。
+标题不念,观众自己会看。
     </aside>
   </section>
 
-  <!-- ============ 2 / 15 承接上集 ============ -->
+  <!-- ============ 2 / 17 承接上集 ============ -->
   <section class="slide">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">接着上一集</div>
@@ -874,7 +1201,7 @@ html, body{
         <div class="card" data-anim style="--d:3">
           <div class="s-num">第一层</div>
           <div class="s-name">公司</div>
-          <div class="s-desc">OpenAI、Anthropic、字节跳动、腾讯</div>
+          <div class="s-desc">OpenAI、Anthropic、字节跳动、腾讯、DeepSeek</div>
         </div>
         <div class="s-chev" data-anim style="--d:4">
           <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
@@ -882,7 +1209,7 @@ html, body{
         <div class="card" data-anim style="--d:5">
           <div class="s-num">第二层</div>
           <div class="s-name">模型</div>
-          <div class="s-desc">GPT-6、Claude、Seed —— 上一集讲过</div>
+          <div class="s-desc">GPT、Claude、豆包、混元 —— 上一集讲过</div>
         </div>
         <div class="s-chev" data-anim style="--d:6">
           <svg class="icon" viewBox="0 0 24 24"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>
@@ -893,16 +1220,19 @@ html, body{
           <div class="s-desc">同一个模型,可以包成完全不同的工具</div>
         </div>
       </div>
+      <div class="for-who" data-anim style="--d:8">
+        <span class="k">今天你能拿走</span>
+        <span>五个工具各两页 · 最后那张对照表,截图就能用</span>
+      </div>
     </div>
     <aside class="notes">
-【承接 · 20 秒】
-上一集讲了公司和模型的关系。今天补第三层:工具。
-同一个模型,可以包成聊天框,也可以包成会自己动手的 agent。
-这就是为什么「都是 GPT」的产品,用起来差别那么大。
+【承接 · 10 秒】
+一句话接上集:前面讲了公司和模型,今天讲模型外面那层壳 —— 工具。
+然后立刻给账:今天五个工具,一个两页;看到最后有一张对照表,截个图就能用。
     </aside>
   </section>
 
-  <!-- ============ 3 / 15 关键区分 ============ -->
+  <!-- ============ 3 / 17 关键区分 ============ -->
   <section class="slide">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">今天最重要的一页</div>
@@ -945,410 +1275,511 @@ html, body{
     </aside>
   </section>
 
-  <!-- ============ 4 / 15 Codex 是什么 ============ -->
-  <section class="slide" style="--brand:var(--brand-tool-codex)">
-    <div class="tool-main">
-      <div class="tool-id">
-        <div class="co-logo" data-anim style="--d:0"><!--LOGO:codex--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></div>
-        <h2 class="tool-name" data-anim style="--d:1">Codex</h2>
-        <p class="tool-by" data-anim style="--d:2">OpenAI 出品</p>
-        <p class="tool-pos" data-anim style="--d:3">OpenAI 自己的编程 agent,一个产品四种用法</p>
-        <div class="tool-forms" data-anim style="--d:4">
-          <span class="pill">终端</span>
-          <span class="pill">桌面 App</span>
-          <span class="pill">云端</span>
-          <span class="pill">IDE 插件</span>
+  <!-- ============ 4 / 17 为什么是现在 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">先说个背景</div>
+      <h2 data-anim style="--d:1">这批工具,是 2026 年才冒出来的</h2>
+    </div>
+    <div class="main">
+      <div class="tl">
+        <div class="tl-item" data-anim style="--d:2">
+          <div class="tl-when">2025.11</div>
+          <div class="tl-what">一个开源项目出现</div>
+          <div class="tl-desc">奥地利一个退休程序员的周末作品,叫 OpenClaw。它让 AI 能直接操作你的电脑</div>
+        </div>
+        <div class="tl-item" data-anim style="--d:3">
+          <div class="tl-when">2026.03</div>
+          <div class="tl-what">它成了 GitHub 星标第一</div>
+          <div class="tl-desc">星标数超过 Linux。中文社区管它叫「龙虾」,腾讯总部外面排队装它</div>
+        </div>
+        <div class="tl-item" data-anim style="--d:4">
+          <div class="tl-when">2026.02</div>
+          <div class="tl-what">大厂同时进场</div>
+          <div class="tl-desc">OpenAI 发 Codex 桌面版,腾讯开始内测 WorkBuddy,阿里、字节、DeepSeek 紧随其后</div>
+        </div>
+        <div class="tl-item" data-anim style="--d:5">
+          <div class="tl-when">2026.06</div>
+          <div class="tl-what">成了一个真市场</div>
+          <div class="tl-desc">17 款桌面办公 Agent 月访问量突破 6000 万次,腾讯系一家占了一半以上</div>
         </div>
       </div>
-      <div class="diagram-wrap" data-anim style="--d:5">
-        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
-          <rect class="win" x="16" y="30" width="424" height="340" rx="16"/>
-          <line class="sep" x1="16" y1="78" x2="440" y2="78"/>
-          <circle class="dot" cx="44" cy="54" r="6"/>
-          <circle class="dot" cx="66" cy="54" r="6"/>
-          <circle class="dot" cx="88" cy="54" r="6"/>
-          <text class="lblInk" x="40" y="124">$ codex "重构这个模块"</text>
-          <rect class="ln" x="40" y="148" width="300" height="12" rx="6"/>
-          <rect class="ln" x="40" y="176" width="352" height="12" rx="6"/>
-          <rect class="ln" x="40" y="204" width="236" height="12" rx="6"/>
-          <rect class="lnInk" x="40" y="244" width="330" height="12" rx="6"/>
-          <rect class="ln" x="40" y="272" width="190" height="12" rx="6"/>
-          <text class="lbl" x="40" y="342">它自己改文件、跑测试</text>
-          <rect class="chip chipOn" x="472" y="30" width="272" height="72" rx="14"/>
-          <text class="lblOn" x="500" y="76">终端 CLI</text>
-          <rect class="chip" x="472" y="118" width="272" height="72" rx="14"/>
-          <text class="lblChip" x="500" y="164">桌面 App</text>
-          <rect class="chip" x="472" y="206" width="272" height="72" rx="14"/>
-          <text class="lblChip" x="500" y="252">云端</text>
-          <rect class="chip" x="472" y="294" width="272" height="72" rx="14"/>
-          <text class="lblChip" x="500" y="340">IDE 插件</text>
+      <div class="takeaway" data-anim style="--d:6">
+        <div class="bar"></div>
+        <div>不是模型又变强了 —— 是模型外面那层壳,变成了主战场</div>
+      </div>
+    </div>
+    <aside class="notes">
+【背景 · 25 秒】
+这一页回答「为什么是现在」。
+去年大家比的是模型谁聪明;今年比的是,同一个模型外面套的那层壳做得好不好。
+这层壳负责给它配工具、管上下文、排步骤、验收结果 —— 行业里管它叫 Harness。
+今天讲的五个工具,本质上都是这层壳,只是做法完全不同。
+数字来源:易观《中国办公智能体平台市场研究报告 2026》,经 36氪 引述。
+    </aside>
+  </section>
+
+  <!-- ============ 5 / 17 Codex 是什么 ============ -->
+  <section class="slide" style="--brand:var(--brand-tool-codex)">
+    <div class="arch-stack">
+      <div class="tid-bar" data-anim style="--d:0">
+        <div class="co-logo"><!--LOGO:codex--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></div>
+        <div class="tid-txt">
+          <h2 class="tool-name">Codex</h2>
+          <p class="tool-by">OpenAI 出品</p>
+          <p class="tid-pos">一个内核,四套壳;2026 年 7 月起收进一个客户端</p>
+        </div>
+        <div class="tid-tail">
+          <span class="formtag"><span class="ft-dot"></span>终端型 · 也有图形界面</span>
+        </div>
+      </div>
+      <div class="diagram-wrap" data-anim style="--d:1">
+        <svg class="diagram" viewBox="0 0 1560 470" aria-hidden="true">
+          <rect class="chip" x="16" y="0" width="340" height="112" rx="16"/>
+          <text class="tMid" x="186" y="70">终端 CLI</text>
+          <rect class="chip" x="412" y="0" width="340" height="112" rx="16"/>
+          <text class="tMid" x="582" y="70">桌面 App</text>
+          <rect class="chip" x="808" y="0" width="340" height="112" rx="16"/>
+          <text class="tMid" x="978" y="70">云端</text>
+          <rect class="chip" x="1204" y="0" width="340" height="112" rx="16"/>
+          <text class="tMid" x="1374" y="70">IDE 插件</text>
+
+          <path class="conn" d="M186 112 V 190"/>
+          <path class="conn" d="M582 112 V 190"/>
+          <path class="conn" d="M978 112 V 190"/>
+          <path class="conn" d="M1374 112 V 190"/>
+          <path class="conn" d="M186 190 H 1374"/>
+          <path class="conn" d="M780 190 V 250"/>
+
+          <rect class="chipOn" x="280" y="250" width="1000" height="120" rx="20"/>
+          <text class="tOn" x="780" y="302">同一个 Codex 内核</text>
+          <text class="tOn" x="780" y="344">同一份配置 · 同一份订阅额度</text>
+
+          <text class="tSml" x="780" y="430">换壳,不换脑子</text>
         </svg>
       </div>
     </div>
     <aside class="notes">
 【Codex · 20 秒】
 第一个,OpenAI 的 Codex。
-它不是一个软件,而是一条产品线,四种用法:终端、桌面 App、云端、IDE 插件。
-左边这个终端就是最常用的形态 —— 你打一句中文,它自己改文件、跑测试。
+它不是一个软件,是「一个内核,四套壳」:终端、桌面 App、云端、IDE 插件。
+同一个 agent 内核、同一份配置文件、同一份订阅额度 —— 你在一个入口学会的,换个入口不用重学。
+2026 年 7 月最大的变化:独立 App 被并进了新的 ChatGPT 桌面端,Codex 变成里面的一个模式。
     </aside>
   </section>
 
-  <!-- ============ 5 / 15 Codex 能干什么 ============ -->
-  <section class="slide" style="--brand:var(--brand-tool-codex)">
+  <!-- ============ 6 / 17 Codex 特点 ============ -->
+  <section class="slide tight" style="--brand:var(--brand-tool-codex)">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">Codex</div>
-      <h2 data-anim style="--d:1">它能干什么</h2>
+      <h2 data-anim style="--d:1">它凭什么翻盘</h2>
     </div>
     <div class="main">
-      <div class="abilities">
-        <div class="card ability" data-anim style="--d:2">
-          <div class="a-num">01</div>
-          <div class="a-name">读懂整个项目</div>
-          <div class="a-desc">不是只看你打开的那个文件,而是把整个仓库读一遍</div>
+      <div class="feats">
+        <div class="feat" data-anim style="--d:2">
+          <div class="f-num">01</div>
+          <div class="f-name">读懂整个仓库</div>
+          <div class="f-desc">不是只看你打开的那个文件,是整个项目读一遍</div>
         </div>
-        <div class="card ability" data-anim style="--d:3">
-          <div class="a-num">02</div>
-          <div class="a-name">自己动手改</div>
-          <div class="a-desc">直接改文件、装依赖、跑测试,不是给你建议让你抄</div>
+        <div class="feat" data-anim style="--d:3">
+          <div class="f-num">02</div>
+          <div class="f-name">挂进你已有的工具</div>
+          <div class="f-desc">能挂进 Slack、Notion 里同时跑好几个 Agent</div>
         </div>
-        <div class="card ability" data-anim style="--d:4">
-          <div class="a-num">03</div>
-          <div class="a-name">并行跑长任务</div>
-          <div class="a-desc">云端可以同时开好几个,你在忙别的它也继续干</div>
+        <div class="feat" data-anim style="--d:4">
+          <div class="f-num">03</div>
+          <div class="f-name">丢到云端跑长任务</div>
+          <div class="f-desc">几个任务并行跑,你在忙别的它也继续干,不用守着</div>
         </div>
       </div>
-      <div class="for-who" data-anim style="--d:5">
-        <span class="k">适合谁</span>
-        <span>已经在用 ChatGPT 订阅的人;要把长任务丢到云端并行跑的人</span>
+      <div class="statband" data-anim style="--d:5">
+        <span class="s-num">60 万 → 500 万</span>
+        <span class="s-cap">周活跃用户,2026 年 1 月到 6 月。<br>OpenAI 官方数字 —— 它是一路翻盘上来的,不是一开始就强</span>
       </div>
       <div class="for-who" data-anim style="--d:6">
+        <span class="k">适合谁</span>
+        <span>已经在付 ChatGPT 订阅的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:7">
         <span class="k">注意</span>
-        <span>能换成别家的模型,但对方必须支持 Responses 接口</span>
+        <span>用户里约 20% 根本不是程序员</span>
       </div>
     </div>
     <aside class="notes">
-【Codex 能力 · 20 秒】
-三件事:读懂整个项目、自己动手改、还能并行跑长任务。
-适合两种人:已经在付 ChatGPT 订阅的,和习惯在终端里干活的人。
-要提醒一句:它也能接别家的模型,但有门槛 —— 要求对方实现 Responses 接口,只兼容普通接口的不行。
+【Codex 特点 · 25 秒】
+它凭什么半年翻八倍?三件事:读懂整个仓库、能挂进你已有的工具里、能把长任务丢到云端并行跑。
+数字是 OpenAI 官方的:2026 年 1 月周活 60 万,到 6 月破了 500 万。
+更有意思的是用户构成:约 20% 不是开发者,而且非开发者的增速是开发者的 3 倍以上。
+OpenAI 自己的说法是「非开发者才是真正的故事」。
+口播补一句:它 2026 年 4 月起改成按 token 点数计费,成本会变得不太可预测。
     </aside>
   </section>
 
-  <!-- ============ 6 / 15 Claude Code 是什么 ============ -->
+  <!-- ============ 7 / 17 Claude Code 是什么 ============ -->
   <section class="slide" style="--brand:var(--brand-tool-claudecode)">
-    <div class="tool-main">
+    <div class="arch-side">
       <div class="tool-id">
         <div class="co-logo" data-anim style="--d:0"><!--LOGO:claudecode--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg><!--/LOGO--></div>
         <h2 class="tool-name" data-anim style="--d:1">Claude<br>Code</h2>
         <p class="tool-by" data-anim style="--d:2">Anthropic 出品</p>
-        <p class="tool-pos" data-anim style="--d:3">终端里最出名的那个编程 agent</p>
-        <div class="tool-forms" data-anim style="--d:4">
-          <span class="pill">终端</span>
-          <span class="pill">IDE 插件</span>
-          <span class="pill">桌面 App</span>
-          <span class="pill">云端会话</span>
-        </div>
+        <p class="tid-pos" data-anim style="--d:3">终端里最出名的那个 —— 它靠「自己验证」立住</p>
+        <span class="formtag" data-anim style="--d:4"><span class="ft-dot"></span>终端原生 · 门槛最高</span>
       </div>
       <div class="diagram-wrap" data-anim style="--d:5">
-        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
-          <rect class="win" x="16" y="40" width="330" height="320" rx="16"/>
-          <line class="sep" x1="16" y1="88" x2="346" y2="88"/>
-          <circle class="dot" cx="44" cy="64" r="6"/>
-          <circle class="dot" cx="66" cy="64" r="6"/>
-          <circle class="dot" cx="88" cy="64" r="6"/>
-          <text class="lblInk" x="40" y="134">$ claude</text>
-          <rect class="ln" x="40" y="158" width="250" height="12" rx="6"/>
-          <rect class="ln" x="40" y="186" width="276" height="12" rx="6"/>
-          <rect class="ln" x="40" y="214" width="200" height="12" rx="6"/>
-          <rect class="lnInk" x="40" y="254" width="262" height="12" rx="6"/>
-          <rect class="ln" x="40" y="282" width="160" height="12" rx="6"/>
-          <text class="lbl" x="40" y="338">改完自己跑测试</text>
-          <rect class="chip" x="420" y="40" width="324" height="62" rx="14"/>
-          <text class="lblChip" x="448" y="80">1 读懂代码库</text>
-          <rect class="chip" x="420" y="118" width="324" height="62" rx="14"/>
-          <text class="lblChip" x="448" y="158">2 跨文件改</text>
-          <rect class="chip chipOn" x="420" y="196" width="324" height="62" rx="14"/>
-          <text class="lblOn" x="448" y="236">3 跑测试验证</text>
-          <rect class="chip" x="420" y="274" width="324" height="62" rx="14"/>
-          <text class="lblChip" x="448" y="314">4 没过就再改</text>
-          <path class="arrDash" d="M400 305 C372 305 372 71 400 71"/>
+        <svg class="diagram" viewBox="0 0 760 440" aria-hidden="true">
+          <circle class="ring" cx="380" cy="220" r="130"/>
+          <circle class="ringBrand" cx="380" cy="220" r="130"/>
+
+          <circle class="node" cx="380" cy="90" r="42"/>
+          <text class="tOnMono" x="380" y="101">1</text>
+          <circle class="node" cx="510" cy="220" r="42"/>
+          <text class="tOnMono" x="510" y="231">2</text>
+          <circle class="node" cx="380" cy="350" r="42"/>
+          <text class="tOnMono" x="380" y="361">3</text>
+          <circle class="node" cx="250" cy="220" r="42"/>
+          <text class="tOnMono" x="250" y="231">4</text>
+
+          <text class="tMid" x="380" y="34">读懂代码库</text>
+          <text class="tL" x="566" y="231">跨文件改</text>
+          <text class="tMid" x="380" y="428">跑测试验证</text>
+          <text class="tL" x="196" y="231" text-anchor="end">没过就再改</text>
+
+          <text class="tMidBig" x="380" y="212">自己验证</text>
+          <text class="tSml" x="380" y="252">不用你盯着</text>
         </svg>
       </div>
     </div>
     <aside class="notes">
 【Claude Code · 20 秒】
 第二个,Anthropic 的 Claude Code。
-它和 Codex 很像,也是终端里的编程 agent,但走的是另一条路线。
-右边这四步是它的工作循环:读懂代码库、跨文件改、跑测试、没过就再改。
+它和 Codex 都是终端里的编程 agent,但走的是另一条路线。
+右边这四步是它的工作循环:读懂代码库、跨文件改、跑测试、没过就再改 —— 转一圈又一圈,直到测试全绿。
+它最被低估的能力就是这一条:让模型在执行过程中验证自己的工作。
+Anthropic 是刻意选终端的,理由是对文件访问的控制最细、权限提示最严。
     </aside>
   </section>
 
-  <!-- ============ 7 / 15 Claude Code 能干什么 ============ -->
-  <section class="slide" style="--brand:var(--brand-tool-claudecode)">
+  <!-- ============ 8 / 17 Claude Code 特点 ============ -->
+  <section class="slide tight" style="--brand:var(--brand-tool-claudecode)">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">Claude Code</div>
       <h2 data-anim style="--d:1">它强在哪里</h2>
     </div>
     <div class="main">
-      <div class="abilities">
-        <div class="card ability" data-anim style="--d:2">
-          <div class="a-num">01</div>
-          <div class="a-name">仓库级改造</div>
-          <div class="a-desc">一次动几十个文件的活,它比聊天框可靠得多</div>
+      <div class="feats">
+        <div class="feat" data-anim style="--d:2">
+          <div class="f-num">01</div>
+          <div class="f-name">仓库级改造</div>
+          <div class="f-desc">一次动几十个文件的活,它比聊天框可靠得多</div>
         </div>
-        <div class="card ability" data-anim style="--d:3">
-          <div class="a-num">02</div>
-          <div class="a-name">会自己验证</div>
-          <div class="a-desc">改完自己跑测试,失败了继续改,不用你盯着</div>
+        <div class="feat" data-anim style="--d:3">
+          <div class="f-num">02</div>
+          <div class="f-name">会自己验证</div>
+          <div class="f-desc">改完自己跑测试,失败了继续改,不用你盯着</div>
         </div>
-        <div class="card ability" data-anim style="--d:4">
-          <div class="a-num">03</div>
-          <div class="a-name">分工可指定模型</div>
-          <div class="a-desc">同一个任务里,能让不同的小 agent 用不同的模型</div>
+        <div class="feat" data-anim style="--d:4">
+          <div class="f-num">03</div>
+          <div class="f-name">生态最深</div>
+          <div class="f-desc">Skills、hooks、SDK 都齐 —— 能把 agent 编进你自己的流水线</div>
         </div>
       </div>
-      <div class="for-who" data-anim style="--d:5">
-        <span class="k">适合谁</span>
-        <span>要动很多文件的改造;对代码质量要求高的人</span>
+      <div class="statband" data-anim style="--d:5">
+        <span class="s-num">46%</span>
+        <span class="s-cap">开发者调研里选它「最喜爱」的比例(Cursor 19%,Copilot 9%)。<br>第三方调研,不是官方数字 —— 但它说明「用得多」和「爱用」是两件事</span>
       </div>
       <div class="for-who" data-anim style="--d:6">
+        <span class="k">适合谁</span>
+        <span>要动很多文件的改造</span>
+      </div>
+      <div class="for-who" data-anim style="--d:7">
         <span class="k">注意</span>
-        <span>要 Claude 的订阅或 API 额度,没有免费档</span>
+        <span>要订阅,没有独立免费档</span>
       </div>
     </div>
     <aside class="notes">
-【Claude Code 能力 · 20 秒】
-它最强的三点:仓库级的大改造、改完自己验证、还能给不同的小 agent 指定不同模型。
-适合要动很多文件、又在意代码质量的人。
-注意它要付费,没有独立免费档。
+【Claude Code 特点 · 25 秒】
+它最强的三点:仓库级的大改造、改完自己验证、生态最深。
+数字用第三方调研:906 个开发者里 46% 选它「最喜爱」,Cursor 19%,Copilot 9%。
+要诚实说明这是调研不是官方数据,但方向很清楚 —— 它不一定用的人最多,但「爱用」的比例最高。
+JetBrains 的调查里,39% 的专业开发者在工作中用它。
+代价:要订阅或 API 额度,没有独立免费档;2026 年一季度 Anthropic 自己承认需求超出规划 8 倍,可靠性下降。
     </aside>
   </section>
 
-  <!-- ============ 8 / 15 Trae 是什么 ============ -->
+  <!-- ============ 9 / 17 Trae 是什么 ============ -->
   <section class="slide" style="--brand:var(--brand-tool-trae)">
-    <div class="tool-main">
-      <div class="tool-id">
-        <div class="co-logo" data-anim style="--d:0"><!--LOGO:trae--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M24 20.5H3.5V17H0V3.5h24ZM3.5 17h17V7h-17Zm8.5-5-2.5 2.5L7 12l2.5-2.5Zm7 0-2.5 2.5L14 12l2.5-2.5z"/></svg><!--/LOGO--></div>
-        <h2 class="tool-name" data-anim style="--d:1">Trae</h2>
-        <p class="tool-by" data-anim style="--d:2">字节跳动出品</p>
-        <p class="tool-pos" data-anim style="--d:3">一个把 AI 装进编辑器的完整开发环境</p>
-        <div class="tool-forms" data-anim style="--d:4">
-          <span class="pill">桌面 IDE</span>
-          <span class="pill">中文优先</span>
-          <span class="pill">也有网页版</span>
+    <div class="arch-stack">
+      <div class="tid-bar" data-anim style="--d:0">
+        <div class="co-logo"><!--LOGO:trae--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M24 20.5H3.5V17H0V3.5h24ZM3.5 17h17V7h-17Zm8.5-5-2.5 2.5L7 12l2.5-2.5Zm7 0-2.5 2.5L14 12l2.5-2.5z"/></svg><!--/LOGO--></div>
+        <div class="tid-txt">
+          <h2 class="tool-name">Trae</h2>
+          <p class="tool-by">字节跳动出品</p>
+          <p class="tid-pos">国内第一个 AI 原生 IDE,把 AI 装进编辑器</p>
+        </div>
+        <div class="tid-tail">
+          <span class="formtag"><span class="ft-dot"></span>IDE 型 · 看得见</span>
         </div>
       </div>
-      <div class="diagram-wrap" data-anim style="--d:5">
-        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
-          <rect class="win" x="16" y="30" width="728" height="340" rx="16"/>
-          <line class="sep" x1="16" y1="78" x2="744" y2="78"/>
-          <circle class="dot" cx="44" cy="54" r="6"/>
-          <circle class="dot" cx="66" cy="54" r="6"/>
-          <circle class="dot" cx="88" cy="54" r="6"/>
-          <line class="sep" x1="212" y1="78" x2="212" y2="370"/>
-          <line class="sep" x1="540" y1="78" x2="540" y2="370"/>
-          <rect class="lnMid" x="40" y="108" width="120" height="12" rx="6"/>
-          <rect class="ln" x="60" y="138" width="100" height="12" rx="6"/>
-          <rect class="ln" x="60" y="166" width="132" height="12" rx="6"/>
-          <rect class="ln" x="80" y="194" width="88" height="12" rx="6"/>
-          <rect class="ln" x="60" y="222" width="112" height="12" rx="6"/>
-          <text class="lbl" x="40" y="342">文件树</text>
-          <rect class="ln" x="240" y="108" width="220" height="14" rx="7"/>
-          <rect class="ln" x="240" y="140" width="272" height="14" rx="7"/>
-          <rect class="lnBrand" x="264" y="172" width="196" height="14" rx="7"/>
-          <rect class="ln" x="240" y="204" width="244" height="14" rx="7"/>
-          <rect class="ln" x="264" y="236" width="176" height="14" rx="7"/>
-          <rect class="ln" x="240" y="268" width="212" height="14" rx="7"/>
-          <text class="lbl" x="240" y="342">代码</text>
-          <rect class="chip" x="564" y="106" width="160" height="100" rx="14"/>
-          <text class="lblChip" x="588" y="164">你说需求</text>
-          <rect class="chip chipOn" x="564" y="232" width="160" height="100" rx="14"/>
-          <text class="lblOn" x="588" y="290">它写完整项目</text>
+      <div class="diagram-wrap" data-anim style="--d:1">
+        <svg class="diagram" viewBox="0 0 1560 470" aria-hidden="true">
+          <rect class="win" x="0" y="0" width="1560" height="470" rx="18"/>
+          <line class="sep" x1="0" y1="64" x2="1560" y2="64"/>
+          <circle class="dot" cx="34" cy="32" r="7"/>
+          <circle class="dot" cx="60" cy="32" r="7"/>
+          <circle class="dot" cx="86" cy="32" r="7"/>
+          <line class="sep" x1="400" y1="64" x2="400" y2="470"/>
+          <line class="sep" x1="1180" y1="64" x2="1180" y2="470"/>
+
+          <text class="tLm" x="30" y="112">src</text>
+          <rect class="lnMid" x="56" y="136" width="220" height="12" rx="6"/>
+          <rect class="ln" x="56" y="166" width="180" height="12" rx="6"/>
+          <rect class="ln" x="56" y="196" width="240" height="12" rx="6"/>
+          <rect class="ln" x="30" y="234" width="200" height="12" rx="6"/>
+          <rect class="ln" x="56" y="264" width="160" height="12" rx="6"/>
+          <text class="tSml" x="200" y="430">文件树</text>
+
+          <rect class="ln" x="440" y="110" width="420" height="14" rx="7"/>
+          <rect class="ln" x="440" y="144" width="520" height="14" rx="7"/>
+          <rect class="lnBrand" x="470" y="178" width="380" height="14" rx="7"/>
+          <rect class="ln" x="440" y="212" width="460" height="14" rx="7"/>
+          <rect class="ln" x="470" y="246" width="340" height="14" rx="7"/>
+          <rect class="ln" x="440" y="280" width="400" height="14" rx="7"/>
+          <text class="tSml" x="790" y="430">代码</text>
+
+          <rect class="chip" x="1210" y="100" width="320" height="150" rx="16"/>
+          <text class="tMid" x="1370" y="184">你说需求</text>
+          <rect class="chipOn" x="1210" y="272" width="320" height="150" rx="16"/>
+          <text class="tOn" x="1370" y="356">它写完整项目</text>
+          <text class="tSml" x="1370" y="452">AI 对话</text>
         </svg>
       </div>
     </div>
     <aside class="notes">
 【Trae · 20 秒】
-第三个,字节跳动的 Trae。
-它不是终端工具,是一个完整的编辑器 —— 左边文件树、中间代码、右边 AI 对话。
-对中文用户特别友好,你直接用中文描述需求,它能从零搭出一个项目。
+第三个,字节跳动的 Trae。它是最不一样的一个形态 —— 不是终端,是一个完整的编辑器。
+左边文件树、中间代码、右边 AI 对话,你直接说需求,它从零搭出一个项目,改动还能用 diff 看得见。
+它的意义是给不习惯终端的人一个完整的环境:你不需要学命令行,也能把活干完。
+它原来的名字叫 TRAE,全称 The Real AI Engineer。
     </aside>
   </section>
 
-  <!-- ============ 9 / 15 Trae 能干什么 ============ -->
-  <section class="slide" style="--brand:var(--brand-tool-trae)">
+  <!-- ============ 10 / 17 Trae 特点 ============ -->
+  <section class="slide tight" style="--brand:var(--brand-tool-trae)">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">Trae</div>
       <h2 data-anim style="--d:1">它适合什么场景</h2>
     </div>
     <div class="main">
-      <div class="abilities">
-        <div class="card ability" data-anim style="--d:2">
-          <div class="a-num">01</div>
-          <div class="a-name">从零建项目</div>
-          <div class="a-desc">一句话描述需求,它把文件、代码、页面全搭出来</div>
+      <div class="feats">
+        <div class="feat" data-anim style="--d:2">
+          <div class="f-num">01</div>
+          <div class="f-name">从零建项目</div>
+          <div class="f-desc">一句话描述需求,它把文件、代码、页面全搭出来</div>
         </div>
-        <div class="card ability" data-anim style="--d:3">
-          <div class="a-num">02</div>
-          <div class="a-name">三种放手程度</div>
-          <div class="a-desc">只聊天、帮你搭、完全交给它自主执行,你选</div>
+        <div class="feat" data-anim style="--d:3">
+          <div class="f-num">02</div>
+          <div class="f-name">三种放手程度</div>
+          <div class="f-desc">只聊天、帮你搭、完全交给它自主执行,你自己选</div>
         </div>
-        <div class="card ability" data-anim style="--d:4">
-          <div class="a-num">03</div>
-          <div class="a-name">中文场景友好</div>
-          <div class="a-desc">用中文提需求、看中文注释,是国内最早上的一批</div>
+        <div class="feat" data-anim style="--d:4">
+          <div class="f-num">03</div>
+          <div class="f-name">中文优先,国内直连</div>
+          <div class="f-desc">用国产模型,不用处理网络和账号;还能语音提需求</div>
         </div>
       </div>
-      <div class="for-who" data-anim style="--d:5">
-        <span class="k">适合谁</span>
-        <span>想在一个窗口里把项目做完的人;不习惯终端的人</span>
+      <div class="statband" data-anim style="--d:5">
+        <span class="s-num">41.2%</span>
+        <span class="s-cap">中国 AI 编程市场份额,行业第一;累计用户超 1200 万。<br>个人版永久免费 —— 这是它涨得最快的原因</span>
       </div>
       <div class="for-who" data-anim style="--d:6">
+        <span class="k">适合谁</span>
+        <span>不习惯终端的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:7">
         <span class="k">注意</span>
-        <span>2026 年 8 月起,团队已并入字节的豆包体系</span>
+        <span>2026 年 8 月起并入豆包体系</span>
       </div>
     </div>
     <aside class="notes">
-【Trae 能力 · 20 秒】
-它适合:从零建项目、想控制放手程度、以及中文场景。
-它最大的价值是给不习惯终端的人一个完整的环境。
-补一个信息:2026 年 8 月,Trae 团队已经并入字节的豆包体系。
+【Trae 特点 · 25 秒】
+三个卖点:从零建项目、三种放手程度、中文优先而且国内直连。
+份额数据:41.2% 的中国 AI 编程市场份额,排第一;累计用户超过 1200 万;个人版永久免费。
+要补一个 2026 年 8 月的变化:字节把 TRAE 和扣子并进了豆包体系 ——
+TRAE Work 归到「豆包工作」,而 TRAE IDE 和命令行继续作为豆包品牌下的编程产品线运营。
+所以「Trae 要没了」是误传,变的是组织归属,不是产品。
     </aside>
   </section>
 
-  <!-- ============ 10 / 15 WorkBuddy 是什么 ============ -->
+  <!-- ============ 11 / 17 WorkBuddy 是什么 ============ -->
   <section class="slide" style="--brand:var(--brand-tool-workbuddy)">
-    <div class="tool-main">
+    <div class="arch-side">
       <div class="tool-id">
         <div class="co-logo" data-anim style="--d:0"><!--LOGO:workbuddy--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><g fill="#FFFFFF"><path d="M28.5931 3.12762C28.9853 2.77585 29.0091 2.76226 29.2968 2.74499C29.7628 2.71096 30.1894 2.93488 30.916 3.59634C32.6132 5.13875 34.9769 8.30904 36.4462 11.0168L37.0138 12.0682L37.8156 12.4668C38.5896 12.8579 39.8593 13.6593 40.3898 14.0895C40.6297 14.2878 40.6638 14.2925 40.9133 14.1954C42.0388 13.7572 43.6506 14.3382 45.0727 15.7024C46.3529 16.9294 47.5794 19.026 48.0491 20.7757C48.1177 21.0574 48.2087 21.6628 48.2419 22.1134C48.349 23.6964 47.8414 24.9608 46.8637 25.5331C46.664 25.6484 46.6505 25.6795 46.6561 26.1774C46.7011 28.5481 46.0621 30.9144 44.7785 33.2221C43.3293 35.8133 40.7489 38.4945 37.2566 41.0199C35.3813 42.3846 30.9445 44.9701 28.9382 45.8778C24.1324 48.0414 20.2794 48.8709 16.9329 48.4609C14.9368 48.219 12.6769 47.44 11.34 46.5355C10.9885 46.2925 10.9325 46.2774 10.6637 46.3543C9.2327 46.7651 7.35867 45.9207 5.76659 44.1535C5.13165 43.4471 4.1065 41.7127 3.77404 40.7843C3.0054 38.6118 3.15852 36.6506 4.18236 35.4799C4.44671 35.1785 4.45511 35.1658 4.39735 34.6589C4.30195 33.8289 4.25837 32.6008 4.30192 31.808L4.33666 31.0674L3.22502 29.101C1.5033 26.0375 0.409325 23.4645 -0.012563 21.4992C-0.235219 20.4218 -0.221193 19.9436 0.0522186 19.5899C0.21871 19.3763 0.764928 19.1545 1.42322 19.0329C3.08041 18.742 6.69466 19.0056 10.7155 19.7155L11.1329 19.788L12.0511 18.976C13.5747 17.6264 14.587 16.8696 16.4531 15.706C18.3981 14.4891 20.5929 13.4877 23.0648 12.695L23.8577 12.4414L24.2939 11.2964C25.8547 7.17615 27.4533 4.13844 28.5931 3.12762ZM15.5182 24.243C13.7542 25.2615 12.8718 25.7706 12.2236 26.3413C9.59893 28.6526 8.61811 32.3134 9.73545 35.6274C10.0114 36.4457 10.5201 37.3283 11.5386 39.0923C12.5571 40.8564 13.0671 41.7383 13.6378 42.3864C15.9491 45.0112 19.6103 45.9929 22.9243 44.8755C23.7426 44.5995 24.6249 44.0899 26.3888 43.0714L36.5375 37.2121C38.3016 36.1936 39.184 35.6845 39.8321 35.1137C42.4568 32.8024 43.4373 29.1409 42.3198 25.8269C42.0438 25.0086 41.5342 24.1264 40.5158 22.3624C39.4973 20.5983 38.9882 19.7159 38.4175 19.0678C36.1062 16.4432 32.4454 15.4622 29.1314 16.5796C28.3131 16.8556 27.431 17.3651 25.6669 18.3836L15.5182 24.243Z"/><rect x="16.4961" y="31.3344" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 16.4961 31.3344)" fill="white" style="fill:white;fill-opacity:1;"/><rect x="27.3125" y="25.0894" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 27.3125 25.0894)" fill="white" style="fill:white;fill-opacity:1;"/></g></svg><!--/LOGO--></div>
-        <h2 class="tool-name" data-anim style="--d:1">WorkBuddy</h2>
+        <h2 class="tool-name" data-anim style="--d:1">Work<br>Buddy</h2>
         <p class="tool-by" data-anim style="--d:2">腾讯云 CodeBuddy 团队出品</p>
-        <p class="tool-pos" data-anim style="--d:3">不是编程工具,是给所有职场人的桌面 Agent</p>
-        <div class="tool-forms" data-anim style="--d:4">
-          <span class="pill">桌面工作台</span>
-          <span class="pill">能读本地文件</span>
-          <span class="pill">微信遥控</span>
+        <p class="tid-pos" data-anim style="--d:3">不是编程工具,是给职场人的桌面 Agent</p>
+        <span class="formtag" data-anim style="--d:4"><span class="ft-dot"></span>桌面型 · 手机遥控</span>
+        <div class="hit" data-anim style="--d:5">
+          <span class="k">命中什么</span>
+          <span class="v">「装完就能用,不用折腾」</span>
         </div>
       </div>
-      <div class="diagram-wrap" data-anim style="--d:5">
-        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
-          <rect class="win" x="16" y="30" width="500" height="340" rx="16"/>
-          <line class="sep" x1="16" y1="78" x2="516" y2="78"/>
-          <circle class="dot" cx="44" cy="54" r="6"/>
-          <circle class="dot" cx="66" cy="54" r="6"/>
-          <circle class="dot" cx="88" cy="54" r="6"/>
-          <text class="lbl" x="40" y="112">它自己去翻你电脑里的文件</text>
-          <rect class="chip" x="40" y="128" width="452" height="66" rx="12"/>
-          <rect class="lnBrand" x="60" y="150" width="20" height="20" rx="6"/>
-          <rect class="ln" x="94" y="152" width="240" height="10" rx="5"/>
-          <rect class="ln" x="94" y="172" width="160" height="10" rx="5"/>
-          <rect class="chip" x="40" y="206" width="452" height="66" rx="12"/>
-          <rect class="lnBrand" x="60" y="228" width="20" height="20" rx="6"/>
-          <rect class="ln" x="94" y="230" width="286" height="10" rx="5"/>
-          <rect class="ln" x="94" y="250" width="130" height="10" rx="5"/>
-          <rect class="chip" x="40" y="284" width="452" height="66" rx="12"/>
-          <rect class="ln" x="60" y="306" width="20" height="20" rx="6"/>
-          <rect class="ln" x="94" y="308" width="212" height="10" rx="5"/>
-          <rect class="ln" x="94" y="328" width="176" height="10" rx="5"/>
-          <rect class="win" x="556" y="60" width="188" height="310" rx="26"/>
-          <rect class="chip chipOn" x="580" y="112" width="140" height="80" rx="12"/>
-          <text class="lblOn" x="598" y="160">微信发一句</text>
-          <rect class="chip" x="580" y="212" width="140" height="80" rx="12"/>
-          <text class="lblChip" x="598" y="260">电脑自己干</text>
-          <text class="lbl" x="580" y="340">人在外面也行</text>
+      <div class="diagram-wrap" data-anim style="--d:6">
+        <svg class="diagram" viewBox="0 0 760 450" aria-hidden="true">
+          <rect class="win" x="0" y="30" width="420" height="330" rx="16"/>
+          <line class="sep" x1="0" y1="78" x2="420" y2="78"/>
+          <circle class="dot" cx="30" cy="54" r="7"/>
+          <circle class="dot" cx="56" cy="54" r="7"/>
+          <circle class="dot" cx="82" cy="54" r="7"/>
+          <text class="tL" x="34" y="118">它自己去翻你电脑里的文件</text>
+          <rect class="chip" x="34" y="136" width="352" height="58" rx="12"/>
+          <rect class="lnBrand" x="52" y="152" width="26" height="26" rx="7"/>
+          <rect class="ln" x="94" y="156" width="220" height="10" rx="5"/>
+          <rect class="ln" x="94" y="174" width="150" height="10" rx="5"/>
+          <rect class="chip" x="34" y="206" width="352" height="58" rx="12"/>
+          <rect class="lnBrand" x="52" y="222" width="26" height="26" rx="7"/>
+          <rect class="ln" x="94" y="226" width="250" height="10" rx="5"/>
+          <rect class="ln" x="94" y="244" width="120" height="10" rx="5"/>
+          <rect class="chip" x="34" y="276" width="352" height="58" rx="12"/>
+          <rect class="ln" x="52" y="292" width="26" height="26" rx="7"/>
+          <rect class="ln" x="94" y="296" width="190" height="10" rx="5"/>
+          <rect class="ln" x="94" y="314" width="160" height="10" rx="5"/>
+          <text class="tSml" x="210" y="404">你的电脑</text>
+
+          <path class="arrDash" d="M552 210 H 436"/>
+          <path class="arr" d="M450 198 L436 210 L450 222"/>
+          <text class="tSml" x="490" y="172">微信发一句</text>
+          <text class="tSml" x="490" y="252">电脑自己干</text>
+
+          <rect class="win" x="560" y="30" width="200" height="400" rx="30"/>
+          <rect class="soft" x="578" y="66" width="164" height="330" rx="18"/>
+          <rect class="chipOn" x="592" y="100" width="136" height="96" rx="14"/>
+          <text class="tOn" x="660" y="156">发一句</text>
+          <rect class="chip" x="592" y="216" width="136" height="96" rx="14"/>
+          <text class="tMid" x="660" y="272">自己干</text>
+          <text class="tSml" x="660" y="360">人在外面也行</text>
         </svg>
       </div>
     </div>
     <aside class="notes">
 【WorkBuddy · 25 秒】
-第四个要特别说明:WorkBuddy 不是编程工具,是腾讯的办公 Agent。
+第四个要特别说明:WorkBuddy 不是编程工具,是腾讯云做的办公 Agent。
 它最不一样的地方是能读你电脑里的本地文件,自己去整理、分析、做成东西。
-右边这个手机是说:你在外面用微信发一句,家里电脑自己开工。
-所以它面向的是不写代码的普通职场人。
+右边这个手机是说:你在外面用微信发一句,家里电脑自己开工,干完把结果发回来。
+所以它面向的是不写代码的普通职场人 —— HR、运营、行政。
+顺带说一句:Anthropic 也有对应的产品叫 Claude Cowork,思路一样,只是国内复制不了微信这个入口。
     </aside>
   </section>
 
-  <!-- ============ 11 / 15 WorkBuddy 能干什么 ============ -->
-  <section class="slide" style="--brand:var(--brand-tool-workbuddy)">
+  <!-- ============ 12 / 17 WorkBuddy 为什么火 ============ -->
+  <section class="slide tight" style="--brand:var(--brand-tool-workbuddy)">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">WorkBuddy</div>
-      <h2 data-anim style="--d:1">它和聊天框差在哪</h2>
+      <h2 data-anim style="--d:1">它凭什么一年做到第一</h2>
     </div>
     <div class="main">
-      <div class="abilities">
-        <div class="card ability" data-anim style="--d:2">
-          <div class="a-num">01</div>
-          <div class="a-name">多个 Agent 并行</div>
-          <div class="a-desc">最多 8 个同时干不同的活,不是排队一个一个来</div>
+      <div class="feats">
+        <div class="feat" data-anim style="--d:2">
+          <div class="f-num">01</div>
+          <div class="f-name">零门槛,下载就用</div>
+          <div class="f-desc">不用配环境、不用绑卡,下载就能用</div>
         </div>
-        <div class="card ability" data-anim style="--d:3">
-          <div class="a-num">02</div>
-          <div class="a-name">能在本地动手</div>
-          <div class="a-desc">直接读你硬盘上的文件、整理归类、提取数据做汇报</div>
+        <div class="feat" data-anim style="--d:3">
+          <div class="f-num">02</div>
+          <div class="f-name">有现成的技能包</div>
+          <div class="f-desc">技能市场 7 万多个,两个月被下载 3000 万次</div>
         </div>
-        <div class="card ability" data-anim style="--d:4">
-          <div class="a-num">03</div>
-          <div class="a-name">三档放手程度</div>
-          <div class="a-desc">只聊、直接干、先给计划再干,按任务复杂度选</div>
+        <div class="feat" data-anim style="--d:4">
+          <div class="f-num">03</div>
+          <div class="f-name">人在外面也能干</div>
+          <div class="f-desc">微信里发一句,电脑自己开工,结果发回聊天</div>
         </div>
       </div>
-      <div class="for-who" data-anim style="--d:5">
-        <span class="k">适合谁</span>
-        <span>不写代码的职场人;要整理一堆文档和数据的人</span>
+      <div class="statband" data-anim style="--d:5">
+        <span class="s-num">2097 万</span>
+        <span class="s-cap">2026 年 6 月桌面端月访问量,行业第一 —— 比第二、第三名加起来还多。<br>腾讯 2026 年一季度财报里,马化腾点名说它是「中国使用最广的效率智能体服务」</span>
       </div>
       <div class="for-who" data-anim style="--d:6">
+        <span class="k">适合谁</span>
+        <span>不写代码的职场人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:7">
         <span class="k">注意</span>
-        <span>腾讯还有 CodeBuddy 和 QClaw,三个名字别混</span>
+        <span>免费额度用完还有人付费吗?没人知道</span>
       </div>
     </div>
     <aside class="notes">
-【WorkBuddy 能力 · 20 秒】
-三点:多 agent 并行、能在本地动手、三档放手程度。
-适合不写代码的职场人,尤其是要整理一堆文档和数据的。
-提醒:腾讯还有 CodeBuddy 和 QClaw,名字很像,但分工完全不同,别混。
+【WorkBuddy 为什么火 · 30 秒】
+这一页是今天的重点之一。它凭什么一年做到第一?三件事。
+第一,零门槛。Codex 和 Claude Code 要在本地跑起来,得先搞定网络、账号、权限,普通人还没开始干活就卡住了。
+WorkBuddy 直接砍掉这一层:下载、扫码、打开就用。这在企业里尤其关键 —— IT 部门不用额外配置,员工自己就能上手。
+第二,不用学指令。内置 20 多个技能包,技能市场 7 万多个,两个月被下载 3000 万次。
+产品负责人原话是:「用户不用懂什么是 Agent、什么是 tool,他只需要知道自己要什么。」
+第三,也是最难被复制的一条:入口。绑了微信之后,手机发一句话,电脑自己开工,结果发回聊天窗口。
+这是 OpenAI 和 Anthropic 在国内做不到的事。
+数字:2026 年 6 月桌面端月访问量 2097 万次,行业第一,比第二三名加起来还多。活跃用户留存超过 60%,付费用户留存超过 80%。
+但必须说清楚代价:公测送 5000 积分拉了一大批人,免费额度用完之后有多少人愿意持续付钱,现在没有答案。
+花旗的研报写的是「最终命运尚待观察」。所以它火得快,不代表商业模式已经被验证。
     </aside>
   </section>
 
-  <!-- ============ 12 / 15 DeepSeek Harness 是什么 ============ -->
+  <!-- ============ 13 / 17 DeepSeek Harness 是什么 ============ -->
   <section class="slide" style="--brand:var(--brand-tool-dsh)">
-    <div class="tool-main">
-      <div class="tool-id">
-        <div class="co-logo" data-anim style="--d:0"><!--LOGO:deepseek--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg><!--/LOGO--></div>
-        <h2 class="tool-name" data-anim style="--d:1">DeepSeek<br>Harness</h2>
-        <p class="tool-by" data-anim style="--d:2">DeepSeek 出品 · 开源</p>
-        <p class="tool-pos" data-anim style="--d:3">一个开源的 agent 运行环境,什么都做成插件</p>
-        <div class="tool-forms" data-anim style="--d:4">
-          <span class="pill">桌面 App</span>
-          <span class="pill">网页界面</span>
-          <span class="pill">开放源代码</span>
+    <div class="arch-stack">
+      <div class="tid-bar" data-anim style="--d:0">
+        <div class="co-logo"><!--LOGO:deepseek--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg><!--/LOGO--></div>
+        <div class="tid-txt">
+          <h2 class="tool-name">DeepSeek Harness</h2>
+          <p class="tool-by">DeepSeek 出品 · 开源</p>
+          <p class="tid-pos">一个 agent 运行环境,连界面都是插件</p>
+        </div>
+        <div class="tid-tail">
+          <span class="formtag"><span class="ft-dot"></span>插件型 · 自己拼</span>
         </div>
       </div>
-      <div class="diagram-wrap" data-anim style="--d:5">
-        <svg class="diagram" viewBox="0 0 760 400" aria-hidden="true">
-          <rect class="win" x="16" y="30" width="728" height="340" rx="16"/>
-          <line class="sep" x1="16" y1="78" x2="744" y2="78"/>
-          <circle class="dot" cx="44" cy="54" r="6"/>
-          <circle class="dot" cx="66" cy="54" r="6"/>
-          <circle class="dot" cx="88" cy="54" r="6"/>
-          <line class="sep" x1="196" y1="78" x2="196" y2="370"/>
-          <rect class="lnMid" x="40" y="108" width="128" height="12" rx="6"/>
-          <rect class="ln" x="40" y="138" width="112" height="12" rx="6"/>
-          <rect class="ln" x="40" y="168" width="136" height="12" rx="6"/>
-          <rect class="ln" x="40" y="198" width="96" height="12" rx="6"/>
-          <rect class="ln" x="40" y="228" width="124" height="12" rx="6"/>
-          <text class="lbl" x="40" y="342">插件</text>
-          <rect class="chip chipOn" x="228" y="106" width="152" height="104" rx="14"/>
-          <text class="lblOn" x="256" y="166">定时任务</text>
-          <rect class="chip chipOn" x="404" y="106" width="152" height="104" rx="14"/>
-          <text class="lblOn" x="432" y="166">多 Agent</text>
-          <rect class="chip chipOn" x="580" y="106" width="148" height="104" rx="14"/>
-          <text class="lblOn" x="608" y="166">语音输入</text>
-          <rect class="chip" x="228" y="230" width="152" height="104" rx="14"/>
-          <text class="lblChip" x="256" y="290">聊天造插件</text>
-          <rect class="chip" x="404" y="230" width="152" height="104" rx="14"/>
-          <text class="lblChip" x="432" y="290">社区插件</text>
-          <rect class="chip" x="580" y="230" width="148" height="104" rx="14"/>
-          <text class="lblChip" x="608" y="290">随便改</text>
+      <div class="diagram-wrap" data-anim style="--d:1">
+        <svg class="diagram" viewBox="0 0 1560 470" aria-hidden="true">
+          <rect class="chip" x="0" y="20" width="190" height="72" rx="14"/>
+          <text class="tMid" x="95" y="65">模型适配</text>
+          <rect class="chip" x="210" y="20" width="190" height="72" rx="14"/>
+          <text class="tMid" x="305" y="65">文件系统</text>
+          <rect class="chip" x="0" y="112" width="190" height="72" rx="14"/>
+          <text class="tMid" x="95" y="157">终端</text>
+          <rect class="chip" x="210" y="112" width="190" height="72" rx="14"/>
+          <text class="tMid" x="305" y="157">沙箱</text>
+          <rect class="chip" x="0" y="204" width="190" height="72" rx="14"/>
+          <text class="tMid" x="95" y="249">存储</text>
+          <rect class="chip" x="210" y="204" width="190" height="72" rx="14"/>
+          <text class="tMid" x="305" y="249">调度</text>
+          <rect class="chip" x="0" y="296" width="190" height="72" rx="14"/>
+          <text class="tMid" x="95" y="341">会话</text>
+          <rect class="chip" x="210" y="296" width="190" height="72" rx="14"/>
+          <text class="tMid" x="305" y="341">界面</text>
+          <text class="tSml" x="200" y="424">每一项能力都是插件</text>
+
+          <path class="arrDash" d="M430 200 H 500"/>
+          <path class="arr" d="M486 188 L500 200 L486 212"/>
+
+          <rect class="chip" x="560" y="70" width="300" height="330" rx="18"/>
+          <rect class="lnBrand" x="590" y="100" width="240" height="12" rx="6"/>
+          <text class="tMidBig" x="710" y="172">终端</text>
+          <rect class="ln" x="590" y="206" width="240" height="10" rx="5"/>
+          <rect class="ln" x="590" y="232" width="180" height="10" rx="5"/>
+          <text class="tSml" x="710" y="330">命令行里干活</text>
+
+          <rect class="chip" x="910" y="70" width="300" height="330" rx="18"/>
+          <rect class="lnBrand" x="940" y="100" width="240" height="12" rx="6"/>
+          <text class="tMidBig" x="1060" y="172">网页</text>
+          <rect class="ln" x="940" y="206" width="240" height="10" rx="5"/>
+          <rect class="ln" x="940" y="232" width="180" height="10" rx="5"/>
+          <text class="tSml" x="1060" y="330">浏览器里干活</text>
+
+          <rect class="chip" x="1260" y="70" width="300" height="330" rx="18"/>
+          <rect class="lnBrand" x="1290" y="100" width="240" height="12" rx="6"/>
+          <text class="tMidBig" x="1410" y="172">自动化</text>
+          <rect class="ln" x="1290" y="206" width="240" height="10" rx="5"/>
+          <rect class="ln" x="1290" y="232" width="180" height="10" rx="5"/>
+          <text class="tSml" x="1410" y="330">别的程序调它</text>
         </svg>
       </div>
     </div>
@@ -1356,53 +1787,118 @@ html, body{
 【DeepSeek Harness · 25 秒】
 最后一个,DeepSeek 的 Harness。
 它的思路和前四个都不一样:它把一切都做成插件,而且开源。
-也就是说,能力不够就装一个插件;找不到合适的,直接跟它聊天让它给你造一个。
-注意它和 DeepSeek 的模型是两回事 —— 模型是模型,这个是运行环境。
+左边这些方块是它的零件 —— 模型、文件系统、终端、沙箱、存储、调度,连界面都是插件。
+换一组零件,同一套代码就能变成终端里的编程 agent,或者浏览器里的应用,或者别的程序能调用的自动化服务。
+它和 DeepSeek 的模型是两回事:模型是模型,这个是运行环境。
     </aside>
   </section>
 
-  <!-- ============ 13 / 15 DeepSeek Harness 能干什么 ============ -->
-  <section class="slide" style="--brand:var(--brand-tool-dsh)">
+  <!-- ============ 14 / 17 DeepSeek Harness 特点 ============ -->
+  <section class="slide tight" style="--brand:var(--brand-tool-dsh)">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">DeepSeek Harness</div>
       <h2 data-anim style="--d:1">它为什么值得单独讲</h2>
     </div>
     <div class="main">
-      <div class="abilities">
-        <div class="card ability" data-anim style="--d:2">
-          <div class="a-num">01</div>
-          <div class="a-name">开源,能自己改</div>
-          <div class="a-desc">代码公开,不满意可以自己动手,不用等厂商更新</div>
+      <div class="feats">
+        <div class="feat" data-anim style="--d:2">
+          <div class="f-num">01</div>
+          <div class="f-name">开源,能自己改</div>
+          <div class="f-desc">MIT 协议,代码全公开,不满意自己动手,不用等厂商排期</div>
         </div>
-        <div class="card ability" data-anim style="--d:3">
-          <div class="a-num">02</div>
-          <div class="a-name">能力靠插件长出来</div>
-          <div class="a-desc">定时任务、多 Agent、语音输入,都是装上去的插件</div>
+        <div class="feat" data-anim style="--d:3">
+          <div class="f-num">02</div>
+          <div class="f-name">一切皆插件</div>
+          <div class="f-desc">连界面和 agent 循环本身都能换掉,不用改它的源码</div>
         </div>
-        <div class="card ability" data-anim style="--d:4">
-          <div class="a-num">03</div>
-          <div class="a-name">聊天就能造插件</div>
-          <div class="a-desc">不会写代码也行,说一句让它给你做一个</div>
+        <div class="feat" data-anim style="--d:4">
+          <div class="f-num">03</div>
+          <div class="f-name">每一步都留痕</div>
+          <div class="f-desc">系统提示、工具调用、上下文注入全写进日志,能回放、能分叉</div>
         </div>
       </div>
-      <div class="for-who" data-anim style="--d:5">
-        <span class="k">适合谁</span>
-        <span>喜欢自己折腾的人;不想被某一家厂商锁死的人</span>
+      <div class="statband" data-anim style="--d:5">
+        <span class="s-num">v0.1</span>
+        <span class="s-cap">2026 年 8 月 13 日发布开发者预览版,同步 MIT 开源。<br>它有四种运行模式 —— 从「只留终端和文件编辑」到「在内存里试新插件」</span>
       </div>
       <div class="for-who" data-anim style="--d:6">
+        <span class="k">适合谁</span>
+        <span>喜欢自己折腾的人</span>
+      </div>
+      <div class="for-who" data-anim style="--d:7">
         <span class="k">注意</span>
-        <span>目前还是公开预览版,不是正式版</span>
+        <span>还是预览版,接口会变</span>
       </div>
     </div>
     <aside class="notes">
-【Harness 能力 · 20 秒】
-三个理由:开源能自己改、能力靠插件长出来、还能直接用聊天造插件。
-适合喜欢折腾、或者不想被一家厂商锁死的人。
-提醒一句:它现在还是公开预览阶段,不是正式版。
+【Harness 特点 · 25 秒】
+三个理由:开源能自己改、一切皆插件、每一步都留痕。
+它最硬的一点是:连 agent 循环本身都能从配置层换掉,不用打补丁、不用 fork。
+第二点是可观测性 —— 系统提示词、思维链、工具调用、上下文注入,全部写进一份只追加的日志,可以用 Trajectory 视图回放。
+对要审计、要调试的团队,这一条比「跑分高」重要得多。
+但要提醒:它 2026 年 8 月 13 日才发 v0.1,是开发者预览版,官方明确说接口还会快速迭代,生产环境别急着上。
     </aside>
   </section>
 
-  <!-- ============ 14 / 15 对照表 ============ -->
+  <!-- ============ 15 / 17 怎么选 ============ -->
+  <section class="slide">
+    <div class="title-block">
+      <div class="kicker" data-anim style="--d:0">怎么选</div>
+      <h2 data-anim style="--d:1">两个问题,就够定下来了</h2>
+    </div>
+    <div class="main">
+      <div class="split-note" data-anim style="--d:2">
+        <span class="k">第一刀</span>
+        <span>先分清两条道:写代码的活,和不写代码的活。拿 Trae 跟 WorkBuddy 比,第一步就错了</span>
+      </div>
+      <div class="fork">
+        <div class="fcol" data-anim style="--d:3">
+          <div class="fq"><span class="dot" style="--brand:var(--brand-tool-claudecode)"></span>写代码的活</div>
+          <div class="fbranch">
+            <div class="fb" style="--brand:var(--brand-tool-claudecode)">
+              <span class="fb-when">习惯在终端干活</span>
+              <span class="fb-what">Claude Code · Codex</span>
+            </div>
+            <div class="fb" style="--brand:var(--brand-tool-trae)">
+              <span class="fb-when">想要一个图形界面</span>
+              <span class="fb-what">Trae</span>
+            </div>
+          </div>
+        </div>
+        <div class="fcol" data-anim style="--d:4">
+          <div class="fq"><span class="dot" style="--brand:var(--brand-tool-workbuddy)"></span>不写代码的活</div>
+          <div class="fbranch">
+            <div class="fb" style="--brand:var(--brand-tool-workbuddy)">
+              <span class="fb-when">不想折腾,装完就用</span>
+              <span class="fb-what">WorkBuddy</span>
+            </div>
+            <div class="fb" style="--brand:var(--brand-tool-dsh)">
+              <span class="fb-when">想自己改,不被锁死</span>
+              <span class="fb-what">DeepSeek Harness</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="takeaway" data-anim style="--d:5">
+        <div class="bar"></div>
+        <div>它们确实很像 —— 差别不在聪明程度,在门槛、入口和花不花钱</div>
+      </div>
+    </div>
+    <aside class="notes">
+【怎么选 · 30 秒】
+选型第一步不是比功能,是先分清两条道。
+写代码的活是 Coding Agent:改代码、跑工程。不写代码的活是 Work Agent:写文档、做分析、跑流程。
+把 Trae 和 WorkBuddy 放一个擂台里比,第一步就错了。
+分完两条道再问两个问题:你习惯在哪干活?你愿不愿意折腾?
+习惯终端、要最大控制权,选 Claude Code;已经在付 ChatGPT 订阅、要云端并行,选 Codex;
+不习惯终端、要看得见,选 Trae。
+不写代码、不想折腾,选 WorkBuddy;想自己改、不想被锁死,选 DeepSeek Harness。
+最后说句实话:这五个确实很像 —— 都不只是聊天框、都能自己拆步骤、都开放扩展。
+真正的差别只有三样:门槛、入口、花不花钱。这也是普通人真正会在意的三件事。
+    </aside>
+  </section>
+
+  <!-- ============ 16 / 17 对照表 ============ -->
   <section class="slide tight">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">一张图带走</div>
@@ -1410,34 +1906,39 @@ html, body{
     </div>
     <div class="main">
       <div class="compare">
-        <div class="crow" data-anim style="--d:2; --brand:var(--brand-tool-codex)">
+        <div class="crow crow5" data-anim style="--d:2; --brand:var(--brand-tool-codex)">
           <span class="c-logo"><!--LOGO:codex--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><!--/LOGO--></span>
           <span class="c-name">Codex</span>
-          <span class="c-form">终端 / 云端 · OpenAI</span>
-          <span class="c-one">OpenAI 自己的编程 agent</span>
+          <span class="c-form">终端 / 桌面 / 云端</span>
+          <span class="c-gate">要 ChatGPT 订阅</span>
+          <span class="c-one">一个内核,四套壳</span>
         </div>
-        <div class="crow" data-anim style="--d:3; --brand:var(--brand-tool-claudecode)">
+        <div class="crow crow5" data-anim style="--d:3; --brand:var(--brand-tool-claudecode)">
           <span class="c-logo"><!--LOGO:claudecode--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg><!--/LOGO--></span>
           <span class="c-name">Claude Code</span>
-          <span class="c-form">终端为主 · Anthropic</span>
+          <span class="c-form">终端原生</span>
+          <span class="c-gate">要订阅,无免费档</span>
           <span class="c-one">动大工程最稳的那个</span>
         </div>
-        <div class="crow" data-anim style="--d:4; --brand:var(--brand-tool-trae)">
+        <div class="crow crow5" data-anim style="--d:4; --brand:var(--brand-tool-trae)">
           <span class="c-logo"><!--LOGO:trae--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M24 20.5H3.5V17H0V3.5h24ZM3.5 17h17V7h-17Zm8.5-5-2.5 2.5L7 12l2.5-2.5Zm7 0-2.5 2.5L14 12l2.5-2.5z"/></svg><!--/LOGO--></span>
           <span class="c-name">Trae</span>
-          <span class="c-form">桌面 IDE · 字节跳动</span>
+          <span class="c-form">桌面 IDE</span>
+          <span class="c-gate">个人版永久免费</span>
           <span class="c-one">给不习惯终端的人</span>
         </div>
-        <div class="crow" data-anim style="--d:5; --brand:var(--brand-tool-workbuddy)">
+        <div class="crow crow5" data-anim style="--d:5; --brand:var(--brand-tool-workbuddy)">
           <span class="c-logo"><!--LOGO:workbuddy--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><g fill="#FFFFFF"><path d="M28.5931 3.12762C28.9853 2.77585 29.0091 2.76226 29.2968 2.74499C29.7628 2.71096 30.1894 2.93488 30.916 3.59634C32.6132 5.13875 34.9769 8.30904 36.4462 11.0168L37.0138 12.0682L37.8156 12.4668C38.5896 12.8579 39.8593 13.6593 40.3898 14.0895C40.6297 14.2878 40.6638 14.2925 40.9133 14.1954C42.0388 13.7572 43.6506 14.3382 45.0727 15.7024C46.3529 16.9294 47.5794 19.026 48.0491 20.7757C48.1177 21.0574 48.2087 21.6628 48.2419 22.1134C48.349 23.6964 47.8414 24.9608 46.8637 25.5331C46.664 25.6484 46.6505 25.6795 46.6561 26.1774C46.7011 28.5481 46.0621 30.9144 44.7785 33.2221C43.3293 35.8133 40.7489 38.4945 37.2566 41.0199C35.3813 42.3846 30.9445 44.9701 28.9382 45.8778C24.1324 48.0414 20.2794 48.8709 16.9329 48.4609C14.9368 48.219 12.6769 47.44 11.34 46.5355C10.9885 46.2925 10.9325 46.2774 10.6637 46.3543C9.2327 46.7651 7.35867 45.9207 5.76659 44.1535C5.13165 43.4471 4.1065 41.7127 3.77404 40.7843C3.0054 38.6118 3.15852 36.6506 4.18236 35.4799C4.44671 35.1785 4.45511 35.1658 4.39735 34.6589C4.30195 33.8289 4.25837 32.6008 4.30192 31.808L4.33666 31.0674L3.22502 29.101C1.5033 26.0375 0.409325 23.4645 -0.012563 21.4992C-0.235219 20.4218 -0.221193 19.9436 0.0522186 19.5899C0.21871 19.3763 0.764928 19.1545 1.42322 19.0329C3.08041 18.742 6.69466 19.0056 10.7155 19.7155L11.1329 19.788L12.0511 18.976C13.5747 17.6264 14.587 16.8696 16.4531 15.706C18.3981 14.4891 20.5929 13.4877 23.0648 12.695L23.8577 12.4414L24.2939 11.2964C25.8547 7.17615 27.4533 4.13844 28.5931 3.12762ZM15.5182 24.243C13.7542 25.2615 12.8718 25.7706 12.2236 26.3413C9.59893 28.6526 8.61811 32.3134 9.73545 35.6274C10.0114 36.4457 10.5201 37.3283 11.5386 39.0923C12.5571 40.8564 13.0671 41.7383 13.6378 42.3864C15.9491 45.0112 19.6103 45.9929 22.9243 44.8755C23.7426 44.5995 24.6249 44.0899 26.3888 43.0714L36.5375 37.2121C38.3016 36.1936 39.184 35.6845 39.8321 35.1137C42.4568 32.8024 43.4373 29.1409 42.3198 25.8269C42.0438 25.0086 41.5342 24.1264 40.5158 22.3624C39.4973 20.5983 38.9882 19.7159 38.4175 19.0678C36.1062 16.4432 32.4454 15.4622 29.1314 16.5796C28.3131 16.8556 27.431 17.3651 25.6669 18.3836L15.5182 24.243Z"/><rect x="16.4961" y="31.3344" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 16.4961 31.3344)" fill="white" style="fill:white;fill-opacity:1;"/><rect x="27.3125" y="25.0894" width="4.00904" height="8.32646" rx="2.00452" transform="rotate(-30 27.3125 25.0894)" fill="white" style="fill:white;fill-opacity:1;"/></g></svg><!--/LOGO--></span>
           <span class="c-name">WorkBuddy</span>
-          <span class="c-form">桌面工作台 · 腾讯</span>
-          <span class="c-one">不写代码也能用的 Agent</span>
+          <span class="c-form">桌面 + 手机遥控</span>
+          <span class="c-gate">有免费额度</span>
+          <span class="c-one">不写代码也能用</span>
         </div>
-        <div class="crow" data-anim style="--d:6; --brand:var(--brand-tool-dsh)">
+        <div class="crow crow5" data-anim style="--d:6; --brand:var(--brand-tool-dsh)">
           <span class="c-logo"><!--LOGO:deepseek--><svg class="logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"/></svg><!--/LOGO--></span>
           <span class="c-name">DSH</span>
-          <span class="c-form">桌面 + 网页 · 开源</span>
+          <span class="c-form">桌面 / 网页 · 开源</span>
+          <span class="c-gate">免费,但要会折腾</span>
           <span class="c-one">能力全靠插件,能自己改</span>
         </div>
       </div>
@@ -1445,42 +1946,43 @@ html, body{
     <aside class="notes">
 【对照表 · 25 秒】
 这一页建议暂停截图。
-口播只念每行最后一句:OpenAI 的编程 agent、动大工程最稳、给不习惯终端的人、
-不写代码也能用、能力全靠插件。DSH 是 DeepSeek Harness 的简称,画面上写全名太长。
+口播只念每行最后一句:一个内核四套壳、动大工程最稳、给不习惯终端的人、不写代码也能用、能力全靠插件。
+中间那一列「门槛」是普通人最容易忽略、又最容易被劝退的地方,建议多说一句。
+DSH 是 DeepSeek Harness 的简称,画面上写全名太长。
     </aside>
   </section>
 
-  <!-- ============ 15 / 15 收尾 ============ -->
+  <!-- ============ 17 / 17 收尾 ============ -->
   <section class="slide">
     <div class="title-block">
       <div class="kicker" data-anim style="--d:0">今天就记一句话</div>
-      <h2 data-anim style="--d:1">会答问题的 AI 和会干活的 AI,是两个物种</h2>
+      <h2 data-anim style="--d:1">它们不像看起来那么像</h2>
     </div>
     <div class="main">
       <div class="cards">
         <div class="card" data-anim style="--d:2">
           <div class="c-top">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
-            <span class="tag">先看形态</span>
+            <span class="tag">第一步</span>
           </div>
-          <div class="c-main">终端?</div>
-          <div class="c-sub">是给习惯终端的人,门槛高但最灵活</div>
+          <div class="c-main">分两条道</div>
+          <div class="c-sub">写代码的活,和不写代码的活 —— 别拿它们互相比</div>
         </div>
         <div class="card" data-anim style="--d:3">
           <div class="c-top">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
-            <span class="tag">再看形态</span>
+            <span class="tag">第二步</span>
           </div>
-          <div class="c-main">带界面?</div>
-          <div class="c-sub">编辑器或桌面工作台,给普通人的入口</div>
+          <div class="c-main">看入口</div>
+          <div class="c-sub">终端、编辑器、桌面、手机 —— 你平时在哪干活</div>
         </div>
         <div class="card is-hit" data-anim style="--d:4">
           <div class="c-top">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L20 6.5"/></svg>
-            <span class="tag">最后一问</span>
+            <span class="tag">第三步</span>
           </div>
-          <div class="c-main">能用吗?</div>
-          <div class="c-sub">写代码的选前三个,不写代码的选 WorkBuddy</div>
+          <div class="c-main">看门槛</div>
+          <div class="c-sub">要不要翻墙、要不要配环境、免费额度够不够用</div>
         </div>
       </div>
       <div class="next-up" data-anim style="--d:5">
@@ -1490,13 +1992,11 @@ html, body{
     </div>
     <aside class="notes">
 【收尾 · 20 秒】
-不用记名字,记一句话就行:会答问题的 AI 和会干活的 AI,是两个物种。
-判断方法就两步:先看形态——终端还是带界面;再问自己会不会写代码。
-写代码的看前三个,不写代码的直接看 WorkBuddy。
+不用记名字,记三个判断就行:先分两条道、再看入口、最后看门槛。
+这三条比记产品名有用 —— 因为产品半年就换一轮,判断方法不会。
 下一集讲:有个活要干,该挑哪个模型。
     </aside>
   </section>
-
 </div>
 
 <div id="notes"><div class="hint">口播备注(N 键开关,录制时请关闭)</div><div class="body"></div></div>

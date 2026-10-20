@@ -112,6 +112,14 @@ html, body{
 }
 .slide.is-active{ display: flex; }
 
+/* ⚠️ 口播备注必须在画面上彻底消失。
+   v2.0 漏了这条规则 —— <aside class="notes"> 是 .slide 的 flex 子元素,
+   默认 display:block,于是每一页的备注文字都**被渲染在幻灯片底部**
+   (深色 16px,贴着 .main 下面),既占掉 40px 版面,也会被录进画面。
+   放映器只是把它的文本读进 #notes 面板,并不依赖它在页面上可见。
+   见 contract.md v2.2「已知踩过的坑」。 */
+.notes{ display: none; }
+
 /* ---------- 固定顶栏(chrome,所有页共用)---------- */
 .chrome{
   position: absolute;
@@ -632,12 +640,14 @@ html, body{
   color: var(--muted);
 }
 .for-who{
-  margin-top: 52px;
+  margin-top: 26px;
   display: flex;
   align-items: baseline;
   gap: 24px;
   font-size: var(--fs-body);
   line-height: 1.4;
+  /* 收窄到 1560 —— 右侧 1670 以外是抖音按钮死区,整块不许越线 */
+  max-width: 1560px;
 }
 .for-who .k{
   font-size: var(--fs-label);
@@ -653,7 +663,7 @@ html, body{
   grid-template-columns: 84px 250px 260px 1fr;
   align-items: center;
   gap: 26px;
-  padding: 18px 0;
+  padding: 16px 0;
   border-top: 2px solid var(--line-2);
 }
 .crow:first-child{ border-top: 4px solid var(--ink); }
@@ -808,17 +818,333 @@ html, body{
   display: flex; align-items: center; justify-content: center;
 }
 .pick .p-logo svg{ width: 32px; height: 32px; fill: #FFFFFF; }
+/* ⚠️ 坑:型号名与厂商名在 HTML 里是两个 <span>(.p-model / .p-why),
+   span 默认是 inline,两者会挤在同一行、中间连空格都没有 ——
+   录像里读出来是「GPT-6 AstraOpenAI · 通用能力最强的一档」。
+   型号名必须独占一行(契约 4.4 的版式图就是两行)。 */
 .pick .p-model{
+  display: block;
   font-family: var(--font-mono);
   font-size: 40px;
   line-height: 1.15;
   letter-spacing: -0.01em;
 }
+/* .p-model / .p-why 都必须是 block:inline 时两者挤在同一行,
+   而且 inline 元素上的 margin-top 根本不生效 —— 间距等于没写。 */
 .pick .p-why{
-  margin-top: 6px;
+  display: block;
+  margin-top: 10px;
   font-size: var(--fs-label);
   color: var(--muted);
 }
 
 /* 两栏卡片组 */
 .cards.cols2{ grid-template-columns: repeat(2, 1fr); }
+/* ==========================================================================
+   第二讲 v3:五种「形态母版」
+   --------------------------------------------------------------------------
+   为什么要重做(记录在案):
+     v2 里五个工具 × 两页共用同一套骨架 —— 左身份栏 + 右白卡示意图,
+     示意图又都由「窗口矩形 + 圆角胶囊」拼成。结果是十个页面肉眼分不出,
+     观众记不住「这五个工具到底差在哪」。
+     v3 的做法:骨架跟着工具的真实形态走,五个工具五套图,另加两页
+     (为什么是现在 / 怎么选)。
+     ⚠️ 本节的品牌色用法放宽了契约第 6 条 —— 见 contract.md v2.2。
+   ========================================================================== */
+
+/* ---------- 通用:形态标签(品牌色实底胶囊)---------- */
+.formtag{
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  align-self: flex-start;
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: var(--brand, var(--ink));
+  color: #FFFFFF;
+  font-size: var(--fs-label);
+  letter-spacing: .14em;
+  white-space: nowrap;
+}
+.formtag .ft-dot{
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.9);
+  flex: none;
+}
+
+/* ---------- 通用:命中什么 ---------- */
+.hit{
+  margin-top: 30px;
+  padding-left: 24px;
+  border-left: 8px solid var(--brand, var(--ink));
+}
+.hit .k{
+  display: block;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.hit .v{
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+/* ---------- 通用:数据带(一个可核实的数字)---------- */
+.statband{
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  padding: 28px 36px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  border-left: 10px solid var(--brand, var(--ink));
+}
+.statband .s-num{
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 54px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--brand, var(--ink));
+  white-space: nowrap;
+}
+.statband .s-cap{
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   骨架 A / C / E:上身份横条 + 下整宽图
+   用在 Codex(汇聚)、Trae(三栏 IDE)、DeepSeek Harness(拼装台)
+   ========================================================================== */
+.arch-stack{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 42px;
+  min-height: 0;
+  /* 重心略上提:让示意图白卡底边停在 930 以内,
+     不要把卡片角落压到抖音右侧按钮的死区里 */
+  padding-bottom: 84px;
+}
+.tid-bar{
+  display: flex;
+  align-items: center;
+  gap: 38px;
+}
+.tid-bar .co-logo{ margin-bottom: 0; flex: none; }
+.tid-bar .tid-txt{ min-width: 0; }
+.tid-bar .tool-name{ font-size: 72px; line-height: 1; letter-spacing: -0.03em; }
+.tid-bar .tool-by{ margin-top: 12px; font-size: var(--fs-label); color: var(--muted); }
+.tid-bar .tid-pos{
+  margin-top: 12px;
+  font-size: var(--fs-body);
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+.tid-bar .tid-tail{
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 18px;
+}
+.arch-stack .diagram-wrap{ padding: 26px 34px 22px; }
+
+/* ==========================================================================
+   骨架 B / D:左身份竖栏 + 右专属图
+   用在 Claude Code(闭环)、WorkBuddy(两端)
+   ========================================================================== */
+.arch-side{
+  flex: 1;
+  display: grid;
+  grid-template-columns: 560px 1fr;
+  column-gap: 64px;
+  align-items: center;
+  min-height: 0;
+}
+.arch-side .tool-name{ font-size: 84px; line-height: 1.06; letter-spacing: -0.03em; }
+.arch-side .tool-by{ margin-top: 22px; font-size: var(--fs-label); color: var(--muted); }
+.arch-side .tid-pos{
+  margin-top: 20px;
+  font-size: var(--fs-body);
+  line-height: 1.36;
+  color: var(--ink-2);
+}
+.arch-side .formtag{ margin-top: 28px; }
+
+/* ==========================================================================
+   第二页母版:特点卡 + 数据带 + 适合谁 / 注意
+   (五页共用,这是「重复带来流畅」的那一半)
+   ========================================================================== */
+.feats{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  margin-bottom: 32px;
+}
+.feat{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--brand, var(--ink));
+  padding: 32px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.feat .f-num{
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--brand, var(--muted));
+}
+.feat .f-name{
+  font-size: 50px;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+}
+.feat .f-desc{
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.feats.cols2{ grid-template-columns: repeat(2, 1fr); }
+
+/* ==========================================================================
+   时间线(「为什么是现在」页)
+   ========================================================================== */
+.tl{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.tl .tl-item{
+  padding: 6px 34px 6px 34px;
+  border-left: 2px solid var(--line);
+}
+.tl .tl-item:first-child{ border-left: none; padding-left: 0; }
+.tl .tl-item:last-child{ padding-right: 0; }
+.tl .tl-when{
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  letter-spacing: .06em;
+}
+.tl .tl-what{
+  margin-top: 20px;
+  font-size: 46px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.tl .tl-desc{
+  margin-top: 18px;
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.takeaway{
+  margin-top: 36px;
+  display: flex;
+  align-items: stretch;
+  gap: 26px;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.takeaway .bar{
+  flex: none;
+  width: 10px;
+  border-radius: 5px;
+  background: var(--ink);
+}
+
+/* ==========================================================================
+   决策页(「怎么选」)
+   ========================================================================== */
+.split-note{
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 22px 32px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  border-top: 8px solid var(--ink);
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.split-note .k{
+  flex: none;
+  font-size: var(--fs-label);
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+.fork{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  margin-top: 40px;
+}
+.fcol .fq{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 50px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  padding-bottom: 22px;
+  border-bottom: 4px solid var(--ink);
+}
+.fcol .fq .dot{
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--brand, var(--ink));
+  flex: none;
+}
+.fbranch{ margin-top: 26px; display: flex; flex-direction: column; gap: 20px; }
+.fb{
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  align-items: baseline;
+  gap: 22px;
+  padding: 20px 26px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  border-left: 8px solid var(--brand, var(--ink));
+}
+.fb .fb-when{ font-size: var(--fs-meta); color: var(--muted); }
+.fb .fb-what{ font-size: 40px; line-height: 1.2; letter-spacing: -0.02em; }
+
+/* ==========================================================================
+   对照表(第二讲版:图标 / 名字 / 形态 / 门槛 / 一句话)
+   ========================================================================== */
+.crow.crow5{ grid-template-columns: 76px 232px 268px 250px 1fr; gap: 24px; }
+.crow .c-gate{ font-size: var(--fs-label); color: var(--muted); }
+
+/* ==========================================================================
+   示意图新增图元
+   ========================================================================== */
+.diagram .soft{ fill: #F2F2EE; }
+.diagram .softBrand{ fill: var(--brand); fill-opacity: .12; }
+.diagram .node{ fill: var(--brand); }
+.diagram .nodeInk{ fill: var(--ink); }
+.diagram .conn{ stroke: var(--line); stroke-width: 3; fill: none; }
+.diagram .connBrand{ stroke: var(--brand); stroke-width: 3; fill: none; }
+.diagram .ring{ fill: none; stroke: var(--line); stroke-width: 3; }
+.diagram .ringBrand{ fill: none; stroke: var(--brand); stroke-width: 4;
+                     stroke-dasharray: 12 10; stroke-linecap: round; }
+.diagram .tOn{ font-family: var(--font-cn); font-size: 26px; fill: #FFFFFF; text-anchor: middle; }
+.diagram .tOnMono{ font-family: var(--font-mono); font-size: 26px; fill: #FFFFFF; text-anchor: middle; }
+.diagram .tMid{ font-family: var(--font-cn); font-size: 26px; fill: var(--ink); text-anchor: middle; }
+.diagram .tMidBig{ font-family: var(--font-cn); font-size: 32px; fill: var(--ink); text-anchor: middle; }
+.diagram .tSml{ font-family: var(--font-cn); font-size: 24px; fill: var(--muted); text-anchor: middle; }
+.diagram .tL{ font-family: var(--font-cn); font-size: 26px; fill: var(--ink); }
+.diagram .tLm{ font-family: var(--font-mono); font-size: 24px; fill: var(--muted); }
