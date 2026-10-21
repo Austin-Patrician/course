@@ -98,7 +98,13 @@ foreach ($page in $pages) {
         throw "$($page.Name): 缺少图标文件:$(($missing | Sort-Object -Unique) -join ', ')"
     }
 
-    [System.IO.File]::WriteAllText($page.FullName, $html, $utf8)
+    # 原子写(契约 §8.5 / §10):先写同目录临时文件,再 rename 覆盖。
+    # 直接 WriteAllText 是「截断 + 写入」两步 —— 同一时刻有别的进程读到一半,
+    # 就会拿到残缺文件(症状:`</html>` 出现 0 次或 2 次)。与 build.sh 的
+    # 临时文件 + os.replace 保持同一套语义。
+    $tmp = $page.FullName + '.buildtmp'
+    [System.IO.File]::WriteAllText($tmp, $html, $utf8)
+    Move-Item -LiteralPath $tmp -Destination $page.FullName -Force
     Write-Host ("{0,-18} CSS={1,-8} JS={2,-8} LOGO={3,2}  {4} 字节" -f `
         $page.Name, $cssState, $jsState, $logoCount, (Get-Item $page.FullName).Length)
 }
